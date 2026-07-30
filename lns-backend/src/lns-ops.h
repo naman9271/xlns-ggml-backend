@@ -14,11 +14,14 @@ void f32_to_lns16_row(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
 
 // Phase 1
 void lns_mul_mat(struct ggml_tensor * dst);
+void lns_mul_mat_id(struct ggml_tensor * dst);
 
 // Phase 2 — element-wise
 void lns_add(struct ggml_tensor * dst);
 void lns_mul(struct ggml_tensor * dst);
+void lns_div(struct ggml_tensor * dst);
 void lns_scale(struct ggml_tensor * dst);
+void lns_clamp(struct ggml_tensor * dst);
 
 // Phase 2 — normalization / attention
 void lns_soft_max(struct ggml_tensor * dst);
@@ -29,11 +32,14 @@ void lns_diag_mask_inf(struct ggml_tensor * dst);
 void lns_silu(struct ggml_tensor * dst);
 void lns_swiglu(struct ggml_tensor * dst);
 void lns_gelu(struct ggml_tensor * dst);
+void lns_geglu(struct ggml_tensor * dst);
 void lns_relu(struct ggml_tensor * dst);
+void lns_tanh(struct ggml_tensor * dst);
 
 // Phase 2 — data movement
 void lns_get_rows(struct ggml_tensor * dst);
 void lns_cpy(struct ggml_tensor * dst);
+void lns_argsort(struct ggml_tensor * dst);
 
 // Phase 2 — positional encoding
 void lns_rope(struct ggml_tensor * dst);

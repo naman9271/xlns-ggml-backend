@@ -1,6 +1,7 @@
 #include "lns-ops.h"
 #include "ggml-impl.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -142,6 +143,84 @@ void lns_mul_mat(struct ggml_tensor * dst) {
 }
 
 // ============================================================
+// MUL_MAT_ID: batched/grouped MUL_MAT for MoE expert FFNs
+// src0: expert weights [n_embd, n_ff, n_expert]
+// src1: activations    [n_embd, n_expert_used_bcast, n_tokens] (F32)
+// src2: ids            [n_expert_used, n_tokens] (I32) — selected expert per slot
+// dst:  [n_ff, n_expert_used, n_tokens]
+// ============================================================
+
+void lns_mul_mat_id(struct ggml_tensor * dst) {
+    const struct ggml_tensor * src0 = dst->src[0];
+    const struct ggml_tensor * src1 = dst->src[1];
+    const struct ggml_tensor * ids  = dst->src[2];
+
+    GGML_ASSERT(ids->type == GGML_TYPE_I32);
+
+    const enum ggml_type type0 = src0->type;
+    const int64_t K = src0->ne[0]; // n_embd
+    const int64_t N = src0->ne[1]; // n_ff
+    const int64_t n_expert = src0->ne[2];
+    GGML_ASSERT(src1->ne[0] == K);
+
+    // Match ggml_mul_mat_id / CPU kernel invariants
+    GGML_ASSERT(src0->nb[0] == ggml_type_size(type0));
+    GGML_ASSERT(src1->nb[0] == ggml_type_size(src1->type));
+    GGML_ASSERT(ids->ne[1] == src1->ne[2]); // one id list per activation token
+
+    const int64_t n_expert_used = ids->ne[0];
+    const int64_t n_tokens      = ids->ne[1];
+    const int64_t ne11          = src1->ne[1]; // activation broadcast rows per token
+
+    GGML_ASSERT(ne11 > 0);
+    GGML_ASSERT(n_expert_used % ne11 == 0); // can broadcast activations over slots
+    GGML_ASSERT(dst->ne[0] == N);
+    GGML_ASSERT(dst->ne[1] == n_expert_used);
+    GGML_ASSERT(dst->ne[2] == n_tokens);
+
+    std::vector<float>  f32_scratch(K);
+    std::vector<xlns16> w_row_lns(K);
+    // Activation rows for the current token, converted once and reused across
+    // every expert slot that broadcasts to the same row (ne11 is 1 in practice).
+    std::vector<xlns16> act_lns((size_t)ne11 * (size_t)K);
+
+    for (int64_t t = 0; t < n_tokens; t++) {
+        for (int64_t i11 = 0; i11 < ne11; i11++) {
+            const void * act_row_raw = (const char *)src1->data + i11*src1->nb[1] + t*src1->nb[2];
+            row_to_xlns16(act_row_raw, src1->type, act_lns.data() + (size_t)i11 * (size_t)K,
+                          f32_scratch.data(), K);
+        }
+
+        for (int64_t s = 0; s < n_expert_used; s++) {
+            const int32_t expert = *(const int32_t *)((const char *)ids->data
+                + t*ids->nb[1] + s*ids->nb[0]);
+            GGML_ASSERT(expert >= 0 && expert < n_expert);
+
+            // Slot-based broadcast (matches CPU one_chunk): act row = s % ne11, not expert % ne11.
+            const int64_t i11 = s % ne11;
+            const xlns16 * act_row_lns = act_lns.data() + (size_t)i11 * (size_t)K;
+
+            const char * expert_base = (const char *)src0->data + expert*src0->nb[2];
+            char * dst_col = (char *)dst->data + s*dst->nb[1] + t*dst->nb[2];
+
+            for (int64_t i0 = 0; i0 < N; i0++) {
+                const void * w_row_raw = expert_base + i0*src0->nb[1];
+                row_to_xlns16(w_row_raw, type0, w_row_lns.data(), f32_scratch.data(), K);
+
+                xlns16 dot = xlns16_vec_dot(w_row_lns.data(), act_row_lns, K);
+
+                void * dst_ptr = dst_col + i0*dst->nb[0];
+                if (dst->type == GGML_TYPE_LNS16) {
+                    *(xlns16 *)dst_ptr = dot;
+                } else {
+                    *(float *)dst_ptr = xlns162fp(dot);
+                }
+            }
+        }
+    }
+}
+
+// ============================================================
 // ADD: dst = src0 + src1 (with broadcasting)
 // ============================================================
 
@@ -151,8 +230,9 @@ void lns_add(struct ggml_tensor * dst) {
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
-    // src1 broadcasts over src0: ne1x <= ne0x
-    GGML_ASSERT(ne10 == ne00 || ne10 == 1);
+    // Match ggml-cpu/binary-ops.cpp apply_binary_op(): full repeat-compatibility
+    // across all dims (not just dim 0), plus dst must match src0's shape.
+    GGML_ASSERT(ggml_can_repeat(src1, src0) && ggml_are_same_shape(src0, dst));
 
     for (int64_t i3 = 0; i3 < ne03; i3++) {
         for (int64_t i2 = 0; i2 < ne02; i2++) {
@@ -182,7 +262,9 @@ void lns_mul(struct ggml_tensor * dst) {
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
-    GGML_ASSERT(ne10 == ne00 || ne10 == 1);
+    // Match ggml-cpu/binary-ops.cpp apply_binary_op(): full repeat-compatibility
+    // across all dims (not just dim 0), plus dst must match src0's shape.
+    GGML_ASSERT(ggml_can_repeat(src1, src0) && ggml_are_same_shape(src0, dst));
 
     for (int64_t i3 = 0; i3 < ne03; i3++) {
         for (int64_t i2 = 0; i2 < ne02; i2++) {
@@ -196,6 +278,36 @@ void lns_mul(struct ggml_tensor * dst) {
                     xlns16 a = read_elem_xlns16(s0, i0, src0->type);
                     xlns16 b = read_elem_xlns16(s1, i0 % ne10, src1->type);
                     write_elem_xlns16(d, i0, dst->type, xlns16_mul(a, b));
+                }
+            }
+        }
+    }
+}
+
+// ============================================================
+// DIV: dst = src0 / src1 (element-wise with broadcasting)
+// ============================================================
+
+void lns_div(struct ggml_tensor * dst) {
+    const struct ggml_tensor * src0 = dst->src[0];
+    const struct ggml_tensor * src1 = dst->src[1];
+
+    GGML_TENSOR_BINARY_OP_LOCALS
+
+    GGML_ASSERT(ggml_can_repeat(src1, src0) && ggml_are_same_shape(src0, dst));
+
+    for (int64_t i3 = 0; i3 < ne03; i3++) {
+        for (int64_t i2 = 0; i2 < ne02; i2++) {
+            for (int64_t i1 = 0; i1 < ne01; i1++) {
+                const void * s0 = (const char *)src0->data + i1*nb01 + i2*nb02 + i3*nb03;
+                const void * s1 = (const char *)src1->data
+                    + (i1 % ne11)*nb11 + (i2 % ne12)*nb12 + (i3 % ne13)*nb13;
+                void * d = (char *)dst->data + i1*nb1 + i2*nb2 + i3*nb3;
+
+                for (int64_t i0 = 0; i0 < ne00; i0++) {
+                    xlns16 a = read_elem_xlns16(s0, i0, src0->type);
+                    xlns16 b = read_elem_xlns16(s1, i0 % ne10, src1->type);
+                    write_elem_xlns16(d, i0, dst->type, xlns16_div(a, b));
                 }
             }
         }
@@ -237,6 +349,39 @@ void lns_scale(struct ggml_tensor * dst) {
             ((xlns16 *)dst->data)[i] = val;
         } else {
             ((float *)dst->data)[i] = xlns162fp(val);
+        }
+    }
+}
+
+// ============================================================
+// CLAMP: dst = max(min(x, max), min)
+// ============================================================
+
+void lns_clamp(struct ggml_tensor * dst) {
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(ggml_is_contiguous(dst));
+    GGML_ASSERT(ggml_are_same_shape(src0, dst));
+
+    float min_f, max_f;
+    memcpy(&min_f, (float *) dst->op_params + 0, sizeof(float));
+    memcpy(&max_f, (float *) dst->op_params + 1, sizeof(float));
+
+    const xlns16 min_lns = fp2xlns16(min_f);
+    const xlns16 max_lns = fp2xlns16(max_f);
+
+    const int64_t n = ggml_nelements(src0);
+
+    for (int64_t i = 0; i < n; i++) {
+        xlns16 v = (src0->type == GGML_TYPE_LNS16)
+            ? ((const xlns16 *)src0->data)[i]
+            : fp2xlns16(((const float *)src0->data)[i]);
+        xlns16 r = xlns16_max(xlns16_min(v, max_lns), min_lns);
+        if (dst->type == GGML_TYPE_LNS16) {
+            ((xlns16 *)dst->data)[i] = r;
+        } else {
+            ((float *)dst->data)[i] = xlns162fp(r);
         }
     }
 }
@@ -399,6 +544,11 @@ void lns_diag_mask_inf(struct ggml_tensor * dst) {
 
 void lns_silu(struct ggml_tensor * dst) {
     const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(ggml_is_contiguous(dst));
+    GGML_ASSERT(ggml_are_same_shape(src0, dst));
+
     const int64_t n = ggml_nelements(src0);
 
     for (int64_t i = 0; i < n; i++) {
@@ -471,11 +621,73 @@ void lns_swiglu(struct ggml_tensor * dst) {
 }
 
 // ============================================================
+// GEGLU: dst = gelu(gate) * up
+// Same structure as SWIGLU (lns_swiglu above), just gelu instead of silu.
+// ============================================================
+
+void lns_geglu(struct ggml_tensor * dst) {
+    const struct ggml_tensor * src0 = dst->src[0];
+    const struct ggml_tensor * src1 = dst->src[1];
+
+    GGML_ASSERT(ggml_is_contiguous_1(src0));
+    GGML_ASSERT(ggml_is_contiguous_1(dst));
+    GGML_ASSERT(src0->type == GGML_TYPE_F32 || src0->type == GGML_TYPE_LNS16);
+    GGML_ASSERT(dst->type  == GGML_TYPE_F32 || dst->type  == GGML_TYPE_LNS16);
+
+    if (src1) {
+        GGML_ASSERT(ggml_is_contiguous_1(src1));
+        GGML_ASSERT(src1->type == GGML_TYPE_F32 || src1->type == GGML_TYPE_LNS16);
+    } else {
+        GGML_ASSERT(src0->ne[0] % 2 == 0);
+    }
+
+    const int64_t nc = src1 ? src0->ne[0] : src0->ne[0] / 2;
+    const int64_t nr = ggml_nrows(src0);
+
+    GGML_ASSERT(dst->ne[0] == nc);
+    GGML_ASSERT(ggml_nrows(dst) == nr);
+    if (src1) {
+        GGML_ASSERT(src1->ne[0] == nc);
+        GGML_ASSERT(ggml_nrows(src1) == nr);
+    }
+
+    const int32_t swapped = ggml_get_op_params_i32(dst, 1);
+    const size_t src0_elem_size = ggml_type_size(src0->type);
+    const size_t src1_elem_size = src1 ? ggml_type_size(src1->type) : src0_elem_size;
+
+    const char * src0_data = (const char *)src0->data;
+    const char * src1_data = src1 ? (const char *)src1->data : src0_data;
+    char * dst_data = (char *)dst->data;
+
+    for (int64_t i1 = 0; i1 < nr; i1++) {
+        const char * gate_row = src0_data + i1*src0->nb[1];
+        const char * up_row   = src1_data + i1*(src1 ? src1->nb[1] : src0->nb[1]);
+        char * dst_row = dst_data + i1*dst->nb[1];
+
+        if (!src1) {
+            gate_row += (swapped ? nc : 0) * src0_elem_size;
+            up_row   += (swapped ? 0 : nc) * src1_elem_size;
+        }
+
+        for (int64_t k = 0; k < nc; k++) {
+            const xlns16 gate = read_elem_xlns16(gate_row, k, src0->type);
+            const xlns16 up   = read_elem_xlns16(up_row,   k, src1 ? src1->type : src0->type);
+            write_elem_xlns16(dst_row, k, dst->type, xlns16_mul(xlns16_gelu(gate), up));
+        }
+    }
+}
+
+// ============================================================
 // GELU: dst = 0.5*x*(1 + tanh(sqrt(2/pi)*(x + 0.044715*x^3)))
 // ============================================================
 
 void lns_gelu(struct ggml_tensor * dst) {
     const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(ggml_is_contiguous(dst));
+    GGML_ASSERT(ggml_are_same_shape(src0, dst));
+
     const int64_t n = ggml_nelements(src0);
 
     for (int64_t i = 0; i < n; i++) {
@@ -497,6 +709,11 @@ void lns_gelu(struct ggml_tensor * dst) {
 
 void lns_relu(struct ggml_tensor * dst) {
     const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(ggml_is_contiguous(dst));
+    GGML_ASSERT(ggml_are_same_shape(src0, dst));
+
     const int64_t n = ggml_nelements(src0);
 
     for (int64_t i = 0; i < n; i++) {
@@ -504,6 +721,32 @@ void lns_relu(struct ggml_tensor * dst) {
             ? ((const xlns16 *)src0->data)[i]
             : fp2xlns16(((const float *)src0->data)[i]);
         xlns16 r = xlns16_relu(v);
+        if (dst->type == GGML_TYPE_LNS16) {
+            ((xlns16 *)dst->data)[i] = r;
+        } else {
+            ((float *)dst->data)[i] = xlns162fp(r);
+        }
+    }
+}
+
+// ============================================================
+// TANH: dst = tanh(x)
+// ============================================================
+
+void lns_tanh(struct ggml_tensor * dst) {
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(ggml_is_contiguous(src0));
+    GGML_ASSERT(ggml_is_contiguous(dst));
+    GGML_ASSERT(ggml_are_same_shape(src0, dst));
+
+    const int64_t n = ggml_nelements(src0);
+
+    for (int64_t i = 0; i < n; i++) {
+        xlns16 v = (src0->type == GGML_TYPE_LNS16)
+            ? ((const xlns16 *)src0->data)[i]
+            : fp2xlns16(((const float *)src0->data)[i]);
+        xlns16 r = xlns16_tanh(v);
         if (dst->type == GGML_TYPE_LNS16) {
             ((xlns16 *)dst->data)[i] = r;
         } else {
@@ -662,6 +905,50 @@ void lns_cpy(struct ggml_tensor * dst) {
 
     GGML_ABORT("lns_cpy: unsupported type conversion %s -> %s\n",
                ggml_type_name(src0->type), ggml_type_name(dst->type));
+}
+
+// ============================================================
+// ARGSORT: dst = permutation of indices sorting src0's rows
+// Reference: ggml-cpu/ops.cpp ggml_compute_forward_argsort_f32()
+// Pure comparison, no arithmetic — xlns16_lt/xlns16_gt (via xlns16_canon)
+// ============================================================
+
+void lns_argsort(struct ggml_tensor * dst) {
+    const struct ggml_tensor * src0 = dst->src[0];
+
+    GGML_ASSERT(dst->type == GGML_TYPE_I32);
+
+    const int64_t nc = src0->ne[0];
+    const int64_t nr = ggml_nrows(src0);
+
+    const enum ggml_sort_order order = (enum ggml_sort_order) ggml_get_op_params_i32(dst, 0);
+
+    std::vector<xlns16> row((size_t)nc);
+
+    for (int64_t i = 0; i < nr; i++) {
+        const void * src_row = (const char *)src0->data + i*src0->nb[1];
+        int32_t * dst_row = (int32_t *)((char *)dst->data + i*dst->nb[1]);
+
+        for (int64_t j = 0; j < nc; j++) {
+            row[(size_t)j] = read_elem_xlns16(src_row, j, src0->type);
+            dst_row[j] = (int32_t)j;
+        }
+
+        switch (order) {
+            case GGML_SORT_ORDER_ASC:
+                std::sort(dst_row, dst_row + nc, [&row](int32_t a, int32_t b) {
+                    return xlns16_lt(row[(size_t)a], row[(size_t)b]);
+                });
+                break;
+            case GGML_SORT_ORDER_DESC:
+                std::sort(dst_row, dst_row + nc, [&row](int32_t a, int32_t b) {
+                    return xlns16_gt(row[(size_t)a], row[(size_t)b]);
+                });
+                break;
+            default:
+                GGML_ABORT("lns_argsort: invalid sort order");
+        }
+    }
 }
 
 // ============================================================

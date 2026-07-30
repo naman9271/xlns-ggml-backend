@@ -45,6 +45,10 @@ static enum ggml_status ggml_backend_lns_graph_compute(ggml_backend_t backend, s
                 lns_mul_mat(node);
                 break;
 
+            case GGML_OP_MUL_MAT_ID:
+                lns_mul_mat_id(node);
+                break;
+
             case GGML_OP_ADD:
                 lns_add(node);
                 break;
@@ -53,8 +57,16 @@ static enum ggml_status ggml_backend_lns_graph_compute(ggml_backend_t backend, s
                 lns_mul(node);
                 break;
 
+            case GGML_OP_DIV:
+                lns_div(node);
+                break;
+
             case GGML_OP_SCALE:
                 lns_scale(node);
+                break;
+
+            case GGML_OP_CLAMP:
+                lns_clamp(node);
                 break;
 
             case GGML_OP_SOFT_MAX:
@@ -74,6 +86,7 @@ static enum ggml_status ggml_backend_lns_graph_compute(ggml_backend_t backend, s
                     case GGML_UNARY_OP_SILU: lns_silu(node); break;
                     case GGML_UNARY_OP_GELU: lns_gelu(node); break;
                     case GGML_UNARY_OP_RELU: lns_relu(node); break;
+                    case GGML_UNARY_OP_TANH: lns_tanh(node); break;
                     default:
                         GGML_ABORT("%s: unsupported unary op\n", __func__);
                 }
@@ -82,6 +95,7 @@ static enum ggml_status ggml_backend_lns_graph_compute(ggml_backend_t backend, s
             case GGML_OP_GLU:
                 switch (ggml_get_glu_op(node)) {
                     case GGML_GLU_OP_SWIGLU: lns_swiglu(node); break;
+                    case GGML_GLU_OP_GEGLU:  lns_geglu(node);  break;
                     default:
                         GGML_ABORT("%s: unsupported GLU op\n", __func__);
                 }
@@ -99,6 +113,10 @@ static enum ggml_status ggml_backend_lns_graph_compute(ggml_backend_t backend, s
 
             case GGML_OP_ROPE:
                 lns_rope(node);
+                break;
+
+            case GGML_OP_ARGSORT:
+                lns_argsort(node);
                 break;
 
             case GGML_OP_NONE:
@@ -268,8 +286,18 @@ static ggml_backend_lns_op_support ggml_backend_lns_check_op(const struct ggml_t
                 "mul_mat_requires_src1_f32_and_convertible_src0"
             };
 
+        case GGML_OP_MUL_MAT_ID:
+            return {
+                op->src[1]->type == GGML_TYPE_F32 &&
+                    op->src[2] != NULL && op->src[2]->type == GGML_TYPE_I32 &&
+                    (src0->type == GGML_TYPE_F32 ||
+                     ggml_get_type_traits(src0->type)->to_float != NULL),
+                "mul_mat_id_requires_src1_f32_and_i32_ids_and_convertible_src0"
+            };
+
         case GGML_OP_ADD:
         case GGML_OP_MUL:
+        case GGML_OP_DIV:
             return {
                 src0->type == GGML_TYPE_F32 &&
                     (op->src[1]->type == GGML_TYPE_F32 ||
@@ -284,11 +312,18 @@ static ggml_backend_lns_op_support ggml_backend_lns_check_op(const struct ggml_t
         case GGML_OP_ROPE:
             return { src0->type == GGML_TYPE_F32, "unary_like_requires_src0_f32" };
 
+        case GGML_OP_CLAMP:
+            return { src0->type == GGML_TYPE_F32, "clamp_requires_src0_f32" };
+
+        case GGML_OP_ARGSORT:
+            return { src0->type == GGML_TYPE_F32, "argsort_requires_src0_f32" };
+
         case GGML_OP_UNARY:
             switch (ggml_get_unary_op(op)) {
                 case GGML_UNARY_OP_SILU:
                 case GGML_UNARY_OP_GELU:
                 case GGML_UNARY_OP_RELU:
+                case GGML_UNARY_OP_TANH:
                     return { src0->type == GGML_TYPE_F32, "unary_activation_requires_src0_f32" };
                 default:
                     return { false, "unsupported_unary_op" };
@@ -296,14 +331,18 @@ static ggml_backend_lns_op_support ggml_backend_lns_check_op(const struct ggml_t
 
         case GGML_OP_GLU: {
             const struct ggml_tensor * src1 = op->src[1];
-            if (ggml_get_glu_op(op) != GGML_GLU_OP_SWIGLU) {
-                return { false, "unsupported_glu_op" };
+            switch (ggml_get_glu_op(op)) {
+                case GGML_GLU_OP_SWIGLU:
+                case GGML_GLU_OP_GEGLU:
+                    break;
+                default:
+                    return { false, "unsupported_glu_op" };
             }
             if (src0->type != GGML_TYPE_F32 || op->type != GGML_TYPE_F32) {
-                return { false, "swiglu_requires_f32_src0_and_dst" };
+                return { false, "glu_requires_f32_src0_and_dst" };
             }
             if (!ggml_is_contiguous_1(src0) || !ggml_is_contiguous_1(op)) {
-                return { false, "swiglu_requires_contiguous_rows" };
+                return { false, "glu_requires_contiguous_rows" };
             }
             if (src1) {
                 return {
@@ -313,14 +352,14 @@ static ggml_backend_lns_op_support ggml_backend_lns_check_op(const struct ggml_t
                         ggml_nrows(src1) == ggml_nrows(src0) &&
                         op->ne[0] == src0->ne[0] &&
                         ggml_nrows(op) == ggml_nrows(src0),
-                    "swiglu_split_requires_matching_f32_contiguous_inputs"
+                    "glu_split_requires_matching_f32_contiguous_inputs"
                 };
             }
             return {
                 src0->ne[0] % 2 == 0 &&
                     op->ne[0] == src0->ne[0] / 2 &&
                     ggml_nrows(op) == ggml_nrows(src0),
-                "swiglu_fused_requires_even_src0_and_half_width_dst"
+                "glu_fused_requires_even_src0_and_half_width_dst"
             };
         }
 
