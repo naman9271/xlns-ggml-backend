@@ -1,6 +1,7 @@
 .exrc
 .cache
 .DS_Store
+.vscode/
 # scripts/
 
 outputs/

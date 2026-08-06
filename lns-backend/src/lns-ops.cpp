@@ -7,6 +7,38 @@
 #include <cstring>
 #include <vector>
 
+// ============================================================
+// xlnscpp inclusion
+// ============================================================
+// System headers are hoisted to global scope here; the nested includes inside
+// the anonymous namespace below are then no-ops (include guards).
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <iostream>
+
+#if defined(GGML_LNS16_SUM_MONTE) && defined(GGML_LNS16_SUM_LPVIP)
+#error "GGML_LNS16_SUM_MONTE and GGML_LNS16_SUM_LPVIP are mutually exclusive (set GGML_LNS16_SUM to one of base|monte|lpvip)"
+#endif
+
+// The xlnscpp .cpp files carry non-inline definitions and mutable global
+// tables, so they may appear in exactly one translation unit per link unit.
+// The anonymous namespace gives this TU a private (internal-linkage) copy so
+// it cannot collide at link/ODR level with ggml-lns32's differently-configured
+// copy of xlns32.cpp.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+namespace {
+
+// xlnscpp declares xlns16_float/xlns32_float overloads of these libm names
+// inside this namespace, which would otherwise hide the global libm functions
+// from the library's own internal calls (unqualified lookup stops at the
+// nearest scope that has the name). Import the global overload sets so both
+// participate in overload resolution.
+using ::sin; using ::cos; using ::exp; using ::log; using ::atan;
+using ::sqrt; using ::pow; using ::fabs; using ::abs;
+
 // xlns16 defines — must be set before including xlns16.cpp
 // (also set via CMake target_compile_definitions; guarded here for clarity).
 // xlns16_table: O(1) float<->xlns16 via 65536-entry lookup table.
@@ -19,7 +51,62 @@
 #define xlns16_alt
 #endif
 
-#include "xlns16.cpp"
+#include "xlns16.cpp"          // must be FIRST: defines xlns16_zero, which
+                               // gates the xlns16_*_lpvip32 family below
+
+#if defined(GGML_LNS16_SUM_LPVIP) || defined(GGML_LNS16_MONTE_BYLPVIP)
+#include "xlns32lpvip.cpp"     // bootstraps xlns32.cpp with xlns32_ideal +
+                               // xlns32_aicasb (aicasb is required for
+                               // accurate lpvip summation)
+#endif
+
+#if defined(GGML_LNS16_SUM_MONTE)
+// The two monte implementations define identical symbols (xlns16_add_monte,
+// xlns16_randombits, ...) and are mutually exclusive — include exactly one.
+// NOTE: xlns16_randombits (LFSR PRNG state) is a mutable global, hit on every
+// monte add. Safe while graph_compute is single-threaded; must become
+// thread_local (with distinct nonzero per-thread seeds — 0 is an absorbing
+// state) if the backend is ever parallelized.
+  #ifdef GGML_LNS16_MONTE_BYLPVIP
+    #include "xlns16monte_bylpvip.cpp"   // MUST come after xlns32lpvip.cpp
+  #else
+    #include "xlns16monte.cpp"           // default: pure 16-bit MCLNS (LFSR)
+  #endif
+#endif
+
+} // anonymous namespace
+#pragma GCC diagnostic pop
+
+// ============================================================
+// Summation-variant selection (compile-time)
+// ============================================================
+// GGML_LNS16_SUM_{MONTE,LPVIP} are set by CMake from GGML_LNS16_SUM.
+// The three families have identical signatures and aliasing guarantees
+// (in-place c == a is safe), so the aliases are drop-in at the call sites.
+
+#if defined(GGML_LNS16_SUM_MONTE)
+  #define LNS16_VEC_DOT        xlns16_vec_dot_monte
+  #define LNS16_SOFTMAX        xlns16_softmax_monte
+  #define LNS16_SOFTMAX_MASKED xlns16_softmax_masked_monte
+  #define LNS16_RMS_NORM       xlns16_rms_norm_monte
+  #define LNS16_SUM_MODE_NAME  "monte"
+#elif defined(GGML_LNS16_SUM_LPVIP)
+  #define LNS16_VEC_DOT        xlns16_vec_dot_lpvip32
+  #define LNS16_SOFTMAX        xlns16_softmax_lpvip32
+  #define LNS16_SOFTMAX_MASKED xlns16_softmax_masked_lpvip32
+  #define LNS16_RMS_NORM       xlns16_rms_norm_lpvip32
+  #define LNS16_SUM_MODE_NAME  "lpvip"
+#else
+  #define LNS16_VEC_DOT        xlns16_vec_dot
+  #define LNS16_SOFTMAX        xlns16_softmax
+  #define LNS16_SOFTMAX_MASKED xlns16_softmax_masked
+  #define LNS16_RMS_NORM       xlns16_rms_norm
+  #define LNS16_SUM_MODE_NAME  "base"
+#endif
+
+const char * lns16_sum_mode_name(void) {
+    return LNS16_SUM_MODE_NAME;
+}
 
 // ============================================================
 // C-linkage conversion helpers (registered as type-trait hooks)
@@ -126,8 +213,8 @@ void lns_mul_mat(struct ggml_tensor * dst) {
                 row_to_xlns16(a_row_raw, type0, a_row_lns.data(), f32_scratch.data(), K);
 
                 for (int64_t i1 = 0; i1 < ne11; i1++) {
-                    xlns16 dot = xlns16_vec_dot(a_row_lns.data(),
-                                                b_lns.data() + (size_t)i1 * (size_t)K, K);
+                    xlns16 dot = LNS16_VEC_DOT(a_row_lns.data(),
+                                               b_lns.data() + (size_t)i1 * (size_t)K, K);
 
                     // Write result: keep as xlns16 if dst is LNS16, else convert to F32
                     void * dst_ptr = (char *)dst->data + i0*nb0 + i1*nb1 + i12*nb2 + i13*nb3;
@@ -207,7 +294,7 @@ void lns_mul_mat_id(struct ggml_tensor * dst) {
                 const void * w_row_raw = expert_base + i0*src0->nb[1];
                 row_to_xlns16(w_row_raw, type0, w_row_lns.data(), f32_scratch.data(), K);
 
-                xlns16 dot = xlns16_vec_dot(w_row_lns.data(), act_row_lns, K);
+                xlns16 dot = LNS16_VEC_DOT(w_row_lns.data(), act_row_lns, K);
 
                 void * dst_ptr = dst_col + i0*dst->nb[0];
                 if (dst->type == GGML_TYPE_LNS16) {
@@ -440,9 +527,9 @@ void lns_soft_max(struct ggml_tensor * dst) {
                     for (int64_t i0 = 0; i0 < ne00; i0++) {
                         mask_lns[(size_t)i0] = f32_mask_to_lns16(mask[i0]);
                     }
-                    xlns16_softmax_masked(row.data(), mask_lns.data(), row.data(), (size_t)ne00, scale_lns);
+                    LNS16_SOFTMAX_MASKED(row.data(), mask_lns.data(), row.data(), (size_t)ne00, scale_lns);
                 } else {
-                    xlns16_softmax(row.data(), row.data(), (size_t)ne00, scale_lns);
+                    LNS16_SOFTMAX(row.data(), row.data(), (size_t)ne00, scale_lns);
                 }
 
                 for (int64_t i0 = 0; i0 < ne00; i0++) {
@@ -484,7 +571,7 @@ void lns_rms_norm(struct ggml_tensor * dst) {
                     row[(size_t)i0] = read_elem_xlns16(s, i0, src0->type);
                 }
 
-                xlns16_rms_norm(row.data(), row.data(), (size_t)ne00, eps_lns);
+                LNS16_RMS_NORM(row.data(), row.data(), (size_t)ne00, eps_lns);
 
                 for (int64_t i0 = 0; i0 < ne00; i0++) {
                     write_elem_xlns16(d, i0, dst->type, row[(size_t)i0]);

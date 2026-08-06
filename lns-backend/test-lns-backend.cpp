@@ -4,10 +4,53 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
-// Test the LNS backend with the same matrix multiply as simple-backend.cpp
+// Test the LNS backends with the same matrix multiply as simple-backend.cpp
+//
+// Usage: test-lns-backend [DEVICE] [PROFILE]
+//   DEVICE  — backend device name to test: LNS16 (default) or LNS32
+//   PROFILE — tolerance profile: base (default) | monte | lpvip
+//             (must match the GGML_LNS16_SUM mode the backend was built with;
+//             ignored for LNS32, which always uses its own tight profile)
+
+// Per-mode tolerances for the summation-dependent tests. The elementwise
+// tests (div/swiglu/geglu/tanh/clamp/argsort) keep their fixed tolerances —
+// no summation variant touches them.
+struct tol_profile {
+    const char * name;
+    float mul_mat;     // scaled error, MUL_MAT reference case
+    float mul_mat_id;  // scaled error, MUL_MAT_ID cases
+    float softmax;     // absolute error on probabilities
+    float rms_norm;    // scaled error
+};
+
+// base:  plain xlns16 accumulation (matches the historical 0.006 matmul gate).
+//        rms_norm at n=576 shows the known accumulator-sticking bias (~4%
+//        observed): the partial sum of squares dwarfs later addends, which is
+//        precisely the phenomenon the monte/lpvip variants address.
+// monte: stochastic dither — unbiased in EXPECTATION but any single reduction
+//        can err more than base (5.7% observed on rms_norm 576 with the
+//        default LFSR seed; the draw depends on the LFSR phase, i.e. on how
+//        many monte adds ran earlier in the process).
+// lpvip: 32-bit LPVIP accumulator — slightly looser than base on short sums
+//        (Mitchell-approximated adds, 1.6% observed on the K=2 matmul),
+//        dramatically better on long sums (0.77% observed on rms_norm 576,
+//        vs base's 4%) — which is its purpose.
+// lns32: 23-bit log fraction, F32-class accuracy
+static const tol_profile PROFILES[] = {
+    { "base",  0.006f, 0.02f,  0.02f, 0.06f },
+    { "monte", 0.03f,  0.05f,  0.05f, 0.08f },
+    { "lpvip", 0.02f,  0.03f,  0.02f, 0.02f },
+    { "lns32", 0.001f, 0.001f, 0.001f, 0.001f },
+};
+
+static tol_profile g_tol = PROFILES[0];
+// True when testing the 16-bit backend (device LNS16); the LNS16-typed-dst
+// mul_mat_id case only applies there.
+static bool g_device_is_lns16 = true;
 
 const int rows_A = 4, cols_A = 2;
 float matrix_A[rows_A * cols_A] = {
@@ -116,7 +159,7 @@ static bool run_mul_mat_test(ggml_backend_sched_t sched) {
     }
     printf(" ]\n\n");
 
-    bool pass = check_close("LNS mul mat", out_data, expected, 0.006f);
+    bool pass = check_close("LNS mul mat", out_data, expected, g_tol.mul_mat);
     ggml_free(ctx);
     return pass;
 }
@@ -256,7 +299,7 @@ static bool run_mul_mat_id_test(ggml_backend_sched_t sched, ggml_backend_t lns_b
             2, 2, 3, // t=3 duplicate expert 2 in two slots
         };
         pass = run_mul_mat_id_case(sched, lns_backend, "LNS mul_mat_id non-broadcast",
-                K, N, n_expert, ne11, n_expert_used, n_tokens, ids, 0.02f, false) && pass;
+                K, N, n_expert, ne11, n_expert_used, n_tokens, ids, g_tol.mul_mat_id, false) && pass;
     }
 
     // Broadcast: ne11 == 1, n_expert_used > 1 (the common real-world MoE shape).
@@ -269,7 +312,7 @@ static bool run_mul_mat_id_test(ggml_backend_sched_t sched, ggml_backend_t lns_b
             1, 1, 0, 7, // t=2 duplicate expert 1 in two slots
         };
         pass = run_mul_mat_id_case(sched, lns_backend, "LNS mul_mat_id broadcast ne11=1",
-                K, N, n_expert, ne11, n_expert_used, n_tokens, ids, 0.02f, false) && pass;
+                K, N, n_expert, ne11, n_expert_used, n_tokens, ids, g_tol.mul_mat_id, false) && pass;
     }
 
     // Partial broadcast: ne11 == 2, n_expert_used == 4 (slots 0,2 share row 0; 1,3 share row 1).
@@ -281,12 +324,14 @@ static bool run_mul_mat_id_test(ggml_backend_sched_t sched, ggml_backend_t lns_b
             3, 0, 4, 2, // t=1
         };
         pass = run_mul_mat_id_case(sched, lns_backend, "LNS mul_mat_id partial broadcast ne11=2",
-                K, N, n_expert, ne11, n_expert_used, n_tokens, ids, 0.02f, false) && pass;
+                K, N, n_expert, ne11, n_expert_used, n_tokens, ids, g_tol.mul_mat_id, false) && pass;
     }
 
     // Same broadcast shape as above, but with an LNS16-typed dst to exercise
     // the xlns16 write path instead of the F32 conversion path.
-    {
+    // Only meaningful (and only supported) on the 16-bit backend: LNS32 has
+    // no LNS-typed ggml tensors at all.
+    if (g_device_is_lns16) {
         const int64_t K = 8, N = 5, n_expert = 8, n_expert_used = 4, n_tokens = 3;
         const int64_t ne11 = 1;
         std::vector<int32_t> ids = {
@@ -295,7 +340,7 @@ static bool run_mul_mat_id_test(ggml_backend_sched_t sched, ggml_backend_t lns_b
             1, 1, 0, 7,
         };
         pass = run_mul_mat_id_case(sched, lns_backend, "LNS mul_mat_id dst=LNS16",
-                K, N, n_expert, ne11, n_expert_used, n_tokens, ids, 0.02f, true) && pass;
+                K, N, n_expert, ne11, n_expert_used, n_tokens, ids, g_tol.mul_mat_id, true) && pass;
     }
 
     return pass;
@@ -716,6 +761,174 @@ static bool run_one_argsort_case(ggml_backend_sched_t sched, const char * name,
     return pass;
 }
 
+// ============================================================
+// SOFT_MAX: validates the summation-variant dispatch (the
+// normalization sum is the reduction that base/monte/lpvip differ on).
+// ============================================================
+
+static void soft_max_ref(const float * x, const float * mask, float scale,
+                         float * out, int64_t n) {
+    std::vector<float> t((size_t)n);
+    float maxv = -INFINITY;
+    for (int64_t i = 0; i < n; i++) {
+        t[(size_t)i] = x[i] * scale + (mask ? mask[i] : 0.0f);
+        if (t[(size_t)i] > maxv) maxv = t[(size_t)i];
+    }
+    float sum = 0.0f;
+    for (int64_t i = 0; i < n; i++) {
+        t[(size_t)i] = expf(t[(size_t)i] - maxv);
+        sum += t[(size_t)i];
+    }
+    for (int64_t i = 0; i < n; i++) {
+        out[i] = t[(size_t)i] / sum;
+    }
+}
+
+static bool run_one_soft_max_case(ggml_backend_sched_t sched, const char * name,
+                                  int64_t ne00, int64_t ne01, float scale, bool masked) {
+    std::vector<float> a((size_t)(ne00 * ne01));
+    // Mixed-magnitude logits: a deterministic pseudo-pattern with both signs.
+    for (int64_t r = 0; r < ne01; r++) {
+        for (int64_t i = 0; i < ne00; i++) {
+            const float u = (float)((i * 37 + r * 101) % 97) / 97.0f; // [0,1)
+            a[(size_t)(r * ne00 + i)] = 8.0f * (u - 0.5f);           // [-4,4)
+        }
+    }
+
+    std::vector<float> mask;
+    if (masked) {
+        mask.assign((size_t)(ne00 * ne01), 0.0f);
+        // Causal-style tail mask plus a few interior holes (exercises the
+        // f32_mask_to_lns sentinel path).
+        for (int64_t r = 0; r < ne01; r++) {
+            for (int64_t i = 0; i < ne00; i++) {
+                const bool tail = i >= ne00 - 1 - r;
+                const bool hole = (i % 13) == 5;
+                if (tail || hole) mask[(size_t)(r * ne00 + i)] = -INFINITY;
+            }
+        }
+    }
+
+    std::vector<float> expected((size_t)(ne00 * ne01));
+    for (int64_t r = 0; r < ne01; r++) {
+        soft_max_ref(a.data() + r * ne00,
+                     masked ? mask.data() + r * ne00 : nullptr,
+                     scale, expected.data() + r * ne00, ne00);
+    }
+
+    std::vector<uint8_t> buf;
+    struct ggml_context * ctx = make_context(buf);
+    struct ggml_cgraph  * gf = ggml_new_graph(ctx);
+
+    struct ggml_tensor * ta = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, ne00, ne01);
+    struct ggml_tensor * tm = masked ? ggml_new_tensor_2d(ctx, GGML_TYPE_F32, ne00, ne01) : nullptr;
+    struct ggml_tensor * result = ggml_soft_max_ext(ctx, ta, tm, scale, 0.0f);
+    ggml_build_forward_expand(gf, result);
+
+    ggml_backend_sched_reset(sched);
+    ggml_backend_sched_alloc_graph(sched, gf);
+    ggml_backend_tensor_set(ta, a.data(), 0, ggml_nbytes(ta));
+    if (masked) {
+        ggml_backend_tensor_set(tm, mask.data(), 0, ggml_nbytes(tm));
+    }
+    ggml_backend_sched_graph_compute(sched, gf);
+
+    struct ggml_tensor * out = ggml_graph_node(gf, -1);
+    std::vector<float> out_data((size_t)ggml_nelements(out));
+    ggml_backend_tensor_get(out, out_data.data(), 0, ggml_nbytes(out));
+
+    // Probabilities: check absolute error per element, plus each row's sum ≈ 1
+    // (informational bias diagnostics are printed for the monte profile).
+    bool pass = true;
+    float max_abs_err = 0.0f;
+    for (size_t i = 0; i < out_data.size(); i++) {
+        const float err = fabsf(out_data[i] - expected[i]);
+        if (err > max_abs_err) max_abs_err = err;
+        if (err > g_tol.softmax) {
+            printf("FAIL %s: element %zu: got %.6f, expected %.6f (abs err %.6f)\n",
+                   name, i, out_data[i], expected[i], err);
+            pass = false;
+        }
+    }
+    for (int64_t r = 0; r < ne01; r++) {
+        float row_sum = 0.0f;
+        for (int64_t i = 0; i < ne00; i++) row_sum += out_data[(size_t)(r * ne00 + i)];
+        if (fabsf(row_sum - 1.0f) > g_tol.softmax * 4.0f) {
+            printf("FAIL %s: row %lld sums to %.6f (expected ~1)\n", name, (long long)r, row_sum);
+            pass = false;
+        }
+    }
+    printf("%s max abs error: %.6f\n", name, max_abs_err);
+    printf("%s result: %s\n\n", name, pass ? "PASS" : "FAIL");
+
+    ggml_free(ctx);
+    return pass;
+}
+
+static bool run_soft_max_test(ggml_backend_sched_t sched) {
+    bool pass = true;
+    pass = run_one_soft_max_case(sched, "LNS softmax short",         8,   4, 1.0f,   false) && pass;
+    pass = run_one_soft_max_case(sched, "LNS softmax long",          512, 4, 1.0f,   false) && pass;
+    pass = run_one_soft_max_case(sched, "LNS softmax scaled",        512, 4, 0.125f, false) && pass;
+    pass = run_one_soft_max_case(sched, "LNS softmax masked",        64,  8, 1.0f,   true)  && pass;
+    pass = run_one_soft_max_case(sched, "LNS softmax masked scaled", 256, 4, 0.125f, true)  && pass;
+    return pass;
+}
+
+// ============================================================
+// RMS_NORM: validates the sum-of-squares reduction variant.
+// ============================================================
+
+static bool run_one_rms_norm_case(ggml_backend_sched_t sched, const char * name,
+                                  int64_t ne00, int64_t ne01, float eps) {
+    std::vector<float> a((size_t)(ne00 * ne01));
+    for (int64_t r = 0; r < ne01; r++) {
+        for (int64_t i = 0; i < ne00; i++) {
+            const float u = (float)((i * 53 + r * 19) % 89) / 89.0f;  // [0,1)
+            a[(size_t)(r * ne00 + i)] = 6.0f * (u - 0.5f);            // [-3,3)
+        }
+    }
+
+    std::vector<float> expected((size_t)(ne00 * ne01));
+    for (int64_t r = 0; r < ne01; r++) {
+        double sum_sq = 0.0;
+        for (int64_t i = 0; i < ne00; i++) {
+            const double v = a[(size_t)(r * ne00 + i)];
+            sum_sq += v * v;
+        }
+        const float inv_rms = 1.0f / sqrtf((float)(sum_sq / (double)ne00) + eps);
+        for (int64_t i = 0; i < ne00; i++) {
+            expected[(size_t)(r * ne00 + i)] = a[(size_t)(r * ne00 + i)] * inv_rms;
+        }
+    }
+
+    std::vector<uint8_t> buf;
+    struct ggml_context * ctx = make_context(buf);
+    struct ggml_cgraph  * gf = ggml_new_graph(ctx);
+
+    struct ggml_tensor * ta = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, ne00, ne01);
+    struct ggml_tensor * result = ggml_rms_norm(ctx, ta, eps);
+    ggml_build_forward_expand(gf, result);
+
+    ggml_backend_sched_reset(sched);
+    ggml_backend_sched_alloc_graph(sched, gf);
+    ggml_backend_tensor_set(ta, a.data(), 0, ggml_nbytes(ta));
+    ggml_backend_sched_graph_compute(sched, gf);
+
+    struct ggml_tensor * out = ggml_graph_node(gf, -1);
+    std::vector<float> out_data((size_t)ggml_nelements(out));
+    ggml_backend_tensor_get(out, out_data.data(), 0, ggml_nbytes(out));
+
+    return check_close(name, out_data, expected.data(), g_tol.rms_norm);
+}
+
+static bool run_rms_norm_test(ggml_backend_sched_t sched) {
+    bool pass = true;
+    pass = run_one_rms_norm_case(sched, "LNS rms_norm short", 16,  3, 1e-5f) && pass;
+    pass = run_one_rms_norm_case(sched, "LNS rms_norm 576",   576, 3, 1e-5f) && pass;
+    return pass;
+}
+
 static bool run_argsort_test(ggml_backend_sched_t sched) {
     constexpr int n = 5;
     const float a[n] = { 3.0f, -1.0f, 4.0f, 1.5f, -5.0f };
@@ -751,19 +964,49 @@ static bool run_argsort_test(ggml_backend_sched_t sched) {
     return pass;
 }
 
-int main(void) {
+int main(int argc, char ** argv) {
+    const char * dev_name = argc > 1 ? argv[1] : "LNS16";
+    const bool is_lns32 = strcmp(dev_name, "LNS32") == 0;
+    g_device_is_lns16 = !is_lns32;
+
+    // Tolerance profile: LNS32 always uses its own tight profile; for LNS16
+    // argv[2] must match the GGML_LNS16_SUM mode the backend was built with.
+    const char * profile_name = is_lns32 ? "lns32" : (argc > 2 ? argv[2] : "base");
+    if (!is_lns32 && strcmp(profile_name, "lns32") == 0) {
+        fprintf(stderr, "ERROR: profile 'lns32' is reserved for the LNS32 device (use base|monte|lpvip)\n");
+        return 1;
+    }
+    bool profile_found = false;
+    for (const tol_profile & p : PROFILES) {
+        if (strcmp(p.name, profile_name) == 0) {
+            g_tol = p;
+            profile_found = true;
+            break;
+        }
+    }
+    if (!profile_found) {
+        fprintf(stderr, "ERROR: unknown tolerance profile '%s' (expected base|monte|lpvip)\n", profile_name);
+        return 1;
+    }
+
+    // Route ops to the device under test. setenv with overwrite=0 respects an
+    // externally set GGML_LNS_BACKEND; must happen before any ggml call (the
+    // backends cache the selection on first use).
+    setenv("GGML_LNS_BACKEND", is_lns32 ? "32" : "16", 0);
+
     ggml_time_init();
 
     ggml_backend_load_all();
 
-    // Try to init the LNS backend by name
-    ggml_backend_t lns_backend = ggml_backend_init_by_name("LNS", nullptr);
+    // Try to init the requested LNS backend by name
+    ggml_backend_t lns_backend = ggml_backend_init_by_name(dev_name, nullptr);
     if (!lns_backend) {
-        fprintf(stderr, "ERROR: LNS backend not found! Make sure ggml was built with -DGGML_LNS=ON\n");
+        fprintf(stderr, "ERROR: %s backend not found! Make sure ggml was built with -DGGML_LNS=ON -DGGML_LNS32=ON\n", dev_name);
         return 1;
     }
 
-    printf("Using backend: %s\n", ggml_backend_name(lns_backend));
+    printf("Using backend: %s (tolerance profile: %s)\n",
+           ggml_backend_name(lns_backend), g_tol.name);
 
     ggml_backend_t cpu_backend = ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, nullptr);
 
@@ -782,6 +1025,8 @@ int main(void) {
     pass = run_geglu_test(sched, "LNS geglu fused swapped", false, true) && pass;
     pass = run_tanh_test(sched) && pass;
     pass = run_clamp_test(sched) && pass;
+    pass = run_soft_max_test(sched) && pass;
+    pass = run_rms_norm_test(sched) && pass;
     pass = run_argsort_test(sched) && pass;
 
     ggml_backend_sched_free(sched);

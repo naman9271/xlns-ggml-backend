@@ -5,6 +5,13 @@
 #   ./setup.sh                    # end-to-end inference (requires at least one model)
 #   ./setup.sh --unit-test        # also build and run test-lns-backend (standalone ggml)
 #   ./setup.sh --unit-test --skip-inference
+#   ./setup.sh --sum-mode=monte   # xlns16 summation variant: base|monte|lpvip
+#                                 # (compile-time; also settable via LNS16_SUM env)
+#
+# Backends: both LNS16 (xlns16) and LNS32 (xlns32) are built. At runtime the
+# GGML_LNS_BACKEND env var (16|32, default 16) selects which backend claims ops.
+# The LNS32 SmolLM2 inference run can be skipped with LNS32_INFERENCE=0
+# (it is slow: float<->xlns32 conversion has no lookup table).
 #
 # Models (at least one required for inference):
 #   MODEL_SMOLLM  — SmolLM2-135M-Instruct-Q4_K_M.gguf (in repo root by default)
@@ -16,6 +23,7 @@
 # in patches/ if integration or build fails.
 
 set -e
+set -o pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 XLNSCPP_DIR="$REPO_ROOT/xlnscpp"
@@ -29,13 +37,23 @@ MODEL_LLAMA32="${MODEL_LLAMA32:-}"
 
 RUN_UNIT_TEST=0
 RUN_INFERENCE=1
+LNS16_SUM="${LNS16_SUM:-base}"
+LNS32_INFERENCE="${LNS32_INFERENCE:-1}"
 
 for arg in "$@"; do
     case "$arg" in
         --unit-test)         RUN_UNIT_TEST=1 ;;
         --skip-inference)    RUN_INFERENCE=0 ;;
+        --sum-mode=*)        LNS16_SUM="${arg#*=}" ;;
+        --sum-mode)          echo "ERROR: use --sum-mode=<base|monte|lpvip> (with '=')" >&2; exit 1 ;;
+        *)                   echo "WARNING: ignoring unknown argument '$arg'" >&2 ;;
     esac
 done
+
+case "$LNS16_SUM" in
+    base|monte|lpvip) ;;
+    *) echo "ERROR: --sum-mode must be base, monte, or lpvip (got '$LNS16_SUM')" >&2; exit 1 ;;
+esac
 
 resolve_model_path() {
     local var_name="$1"
@@ -81,23 +99,33 @@ check_deps() {
     done
 }
 
+# NOTE: functions below are invoked from contexts where `set -e` is suppressed
+# (the `if ! run_build_and_test` retry wrapper disables errexit inside the
+# whole call tree — a bash rule), so failures must be propagated explicitly
+# with `|| return 1`.
 copy_backend() {
     local dest_src="$1"
     local dest_inc="$2"
-    mkdir -p "$dest_src"
-    cp "$REPO_ROOT/lns-backend/src/ggml-lns.cpp" "$dest_src/"
-    cp "$REPO_ROOT/lns-backend/src/lns-ops.cpp"  "$dest_src/"
-    cp "$REPO_ROOT/lns-backend/src/lns-ops.h"    "$dest_src/"
-    cp "$REPO_ROOT/lns-backend/src/CMakeLists.txt" "$dest_src/"
-    cp "$REPO_ROOT/lns-backend/include/ggml-lns.h" "$dest_inc/"
+    local dest_src32="${dest_src%/ggml-lns}/ggml-lns32"
+    mkdir -p "$dest_src" "$dest_src32" || return 1
+    cp "$REPO_ROOT/lns-backend/src/ggml-lns.cpp" "$dest_src/" || return 1
+    cp "$REPO_ROOT/lns-backend/src/lns-ops.cpp"  "$dest_src/" || return 1
+    cp "$REPO_ROOT/lns-backend/src/lns-ops.h"    "$dest_src/" || return 1
+    cp "$REPO_ROOT/lns-backend/src/CMakeLists.txt" "$dest_src/" || return 1
+    cp "$REPO_ROOT/lns-backend/include/ggml-lns.h" "$dest_inc/" || return 1
+    cp "$REPO_ROOT/lns-backend/src32/ggml-lns32.cpp" "$dest_src32/" || return 1
+    cp "$REPO_ROOT/lns-backend/src32/lns32-ops.cpp"  "$dest_src32/" || return 1
+    cp "$REPO_ROOT/lns-backend/src32/lns32-ops.h"    "$dest_src32/" || return 1
+    cp "$REPO_ROOT/lns-backend/src32/CMakeLists.txt" "$dest_src32/" || return 1
+    cp "$REPO_ROOT/lns-backend/include/ggml-lns32.h" "$dest_inc/" || return 1
 }
 
 fetch_latest() {
     local repo_dir="$1"
     local branch="${2:-master}"
-    cd "$repo_dir"
-    git fetch origin
-    git reset --hard "origin/$branch"
+    cd "$repo_dir" || return 1
+    git fetch origin || return 1
+    git reset --hard "origin/$branch" || return 1
     echo "    at $(git rev-parse --short HEAD)"
 }
 
@@ -119,7 +147,7 @@ fallback_xlnscpp() {
 
 prepare_ggml_test_files() {
     local ggml_dir="$1"
-    cp "$REPO_ROOT/lns-backend/test-lns-backend.cpp" "$ggml_dir/examples/simple/"
+    cp "$REPO_ROOT/lns-backend/test-lns-backend.cpp" "$ggml_dir/examples/simple/" || return 1
     if ! grep -q 'test-lns-backend' "$ggml_dir/examples/simple/CMakeLists.txt"; then
         cat >> "$ggml_dir/examples/simple/CMakeLists.txt" << 'EOF'
 
@@ -135,41 +163,43 @@ prepare_ggml() {
     local ggml_dir="$1"
     if [ ! -d "$ggml_dir/.git" ]; then
         echo "    Cloning ggml..."
-        git clone https://github.com/ggml-org/ggml.git "$ggml_dir"
+        git clone https://github.com/ggml-org/ggml.git "$ggml_dir" || return 1
     fi
     echo "    Fetching latest ggml"
-    fetch_latest "$ggml_dir"
+    fetch_latest "$ggml_dir" || return 1
     integrate_lns_or_fallback "$ggml_dir" \
-        "$REPO_ROOT/patches/ggml-core.patch" "$GGML_BASE_COMMIT"
-    copy_backend "$ggml_dir/src/ggml-lns" "$ggml_dir/include"
+        "$REPO_ROOT/patches/ggml-core.patch" "$GGML_BASE_COMMIT" || return 1
+    copy_backend "$ggml_dir/src/ggml-lns" "$ggml_dir/include" || return 1
 }
 
 prepare_llama() {
     local llama_dir="$1"
     if [ ! -d "$llama_dir/.git" ]; then
         echo "    Cloning llama.cpp (this may take a few minutes)..."
-        git clone https://github.com/ggml-org/llama.cpp.git "$llama_dir"
+        git clone https://github.com/ggml-org/llama.cpp.git "$llama_dir" || return 1
     fi
     echo "    Fetching latest llama.cpp"
-    fetch_latest "$llama_dir"
+    fetch_latest "$llama_dir" || return 1
     integrate_lns_or_fallback "$llama_dir" \
-        "$REPO_ROOT/patches/llama-core.patch" "$LLAMA_BASE_COMMIT"
-    copy_backend "$llama_dir/ggml/src/ggml-lns" "$llama_dir/ggml/include"
+        "$REPO_ROOT/patches/llama-core.patch" "$LLAMA_BASE_COMMIT" || return 1
+    copy_backend "$llama_dir/ggml/src/ggml-lns" "$llama_dir/ggml/include" || return 1
 }
 
 run_inference() {
     local label="$1"
     local model_path="$2"
     local llama_bin="$3"
+    local backend="${4:-16}"   # GGML_LNS_BACKEND: 16 or 32
+    local n_tokens="${5:-20}"
 
     echo ""
-    echo "==> Running LNS inference: $label"
-    "$llama_bin" \
+    echo "==> Running LNS inference: $label (backend: LNS$backend, sum mode: $LNS16_SUM)"
+    GGML_LNS_BACKEND="$backend" "$llama_bin" \
         -m "$model_path" \
         -p "The capital of France is" \
-        -n 20 \
+        -n "$n_tokens" \
         -fa 0 \
-        -no-cnv
+        -no-cnv || return 1
 }
 
 run_build_and_test() {
@@ -180,22 +210,28 @@ run_build_and_test() {
         echo "==> Setting up standalone ggml for unit test"
 
         GGML_DIR="$BUILD_DIR/ggml"
-        prepare_ggml "$GGML_DIR"
-        prepare_ggml_test_files "$GGML_DIR"
+        prepare_ggml "$GGML_DIR" || return 1
+        prepare_ggml_test_files "$GGML_DIR" || return 1
 
-        echo "    Building"
-        mkdir -p "$GGML_DIR/build-lns"
-        cd "$GGML_DIR/build-lns"
+        echo "    Building (sum mode: $LNS16_SUM)"
+        mkdir -p "$GGML_DIR/build-lns" || return 1
+        cd "$GGML_DIR/build-lns" || return 1
         cmake .. \
             -DGGML_LNS=ON \
+            -DGGML_LNS32=ON \
+            -DGGML_LNS16_SUM="$LNS16_SUM" \
             -DGGML_METAL=OFF \
             -DCMAKE_BUILD_TYPE=Release \
-            -DXLNSCPP_DIR="$XLNSCPP_DIR"
-        cmake --build . --target test-lns-backend -j"$JOBS"
+            -DXLNSCPP_DIR="$XLNSCPP_DIR" || return 1
+        cmake --build . --target test-lns-backend -j"$JOBS" || return 1
 
         echo ""
-        echo "==> Running test-lns-backend"
-        ./bin/test-lns-backend
+        echo "==> Running test-lns-backend (LNS16, tolerance profile: $LNS16_SUM)"
+        GGML_LNS_BACKEND=16 ./bin/test-lns-backend LNS16 "$LNS16_SUM" || return 1
+
+        echo ""
+        echo "==> Running test-lns-backend (LNS32)"
+        GGML_LNS_BACKEND=32 ./bin/test-lns-backend LNS32 || return 1
     fi
 
     # ── End-to-end inference (llama.cpp) ─────────────────────────────────────
@@ -205,26 +241,33 @@ run_build_and_test() {
         echo "==> Setting up llama.cpp for end-to-end LNS inference"
 
         LLAMA_DIR="$BUILD_DIR/llama.cpp"
-        prepare_llama "$LLAMA_DIR"
+        prepare_llama "$LLAMA_DIR" || return 1
 
-        echo "    Building llama-completion"
-        mkdir -p "$LLAMA_DIR/build-lns"
-        cd "$LLAMA_DIR/build-lns"
+        echo "    Building llama-completion (sum mode: $LNS16_SUM)"
+        mkdir -p "$LLAMA_DIR/build-lns" || return 1
+        cd "$LLAMA_DIR/build-lns" || return 1
         cmake .. \
             -DGGML_LNS=ON \
+            -DGGML_LNS32=ON \
+            -DGGML_LNS16_SUM="$LNS16_SUM" \
             -DGGML_METAL=OFF \
             -DGGML_CPU_REPACK=OFF \
             -DCMAKE_BUILD_TYPE=Release \
-            -DXLNSCPP_DIR="$XLNSCPP_DIR"
-        cmake --build . --target llama-completion -j"$JOBS"
+            -DXLNSCPP_DIR="$XLNSCPP_DIR" || return 1
+        cmake --build . --target llama-completion -j"$JOBS" || return 1
 
         LLAMA_BIN="$LLAMA_DIR/build-lns/bin/llama-completion"
 
         if [ -n "$MODEL_SMOLLM" ]; then
-            run_inference "SmolLM2-135M-Instruct" "$MODEL_SMOLLM" "$LLAMA_BIN"
+            run_inference "SmolLM2-135M-Instruct" "$MODEL_SMOLLM" "$LLAMA_BIN" 16 20 || return 1
+            if [ "$LNS32_INFERENCE" -eq 1 ]; then
+                # Short run: the LNS32 backend converts every weight element
+                # through libm log() per matmul (no lookup table exists).
+                run_inference "SmolLM2-135M-Instruct" "$MODEL_SMOLLM" "$LLAMA_BIN" 32 4 || return 1
+            fi
         fi
         if [ -n "$MODEL_LLAMA32" ]; then
-            run_inference "Llama-3.2-1B-Instruct" "$MODEL_LLAMA32" "$LLAMA_BIN"
+            run_inference "Llama-3.2-1B-Instruct" "$MODEL_LLAMA32" "$LLAMA_BIN" 16 20 || return 1
         fi
     fi
 }

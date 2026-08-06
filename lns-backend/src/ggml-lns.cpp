@@ -21,7 +21,7 @@ struct ggml_backend_lns_context {
 // ============================================================
 
 static const char * ggml_backend_lns_get_name(ggml_backend_t backend) {
-    return "LNS";
+    return "LNS16";
 
     GGML_UNUSED(backend);
 }
@@ -172,6 +172,13 @@ static ggml_guid_t ggml_backend_lns_guid(void) {
 // ============================================================
 
 ggml_backend_t ggml_backend_lns_init(void) {
+    static bool logged = false;
+    if (!logged) {
+        logged = true;
+        std::fprintf(stderr, "ggml-lns: LNS16 backend initialized (sum mode: %s)\n",
+                     lns16_sum_mode_name());
+    }
+
     ggml_backend_lns_context * ctx = new ggml_backend_lns_context;
 
     ggml_backend_t backend = new ggml_backend {
@@ -193,7 +200,7 @@ bool ggml_backend_is_lns(ggml_backend_t backend) {
 // ============================================================
 
 static const char * ggml_backend_lns_device_get_name(ggml_backend_dev_t dev) {
-    return "LNS";
+    return "LNS16";
 
     GGML_UNUSED(dev);
 }
@@ -265,6 +272,18 @@ static bool ggml_backend_lns_audit_enabled(void) {
         return env != nullptr && env[0] != '\0' && strcmp(env, "0") != 0;
     }();
     return enabled;
+}
+
+// Arbitration between the LNS16 and LNS32 backends. Both are ACCEL backends
+// sharing the CPU buffer type, so the scheduler would hand every mutually
+// supported op to whichever registered first — the env var decides which one
+// claims ops for this run. Default: 16.
+static bool lns_backend_enabled_by_env(bool is_lns32) {
+    static const int sel = []() {
+        const char * env = std::getenv("GGML_LNS_BACKEND");
+        return (env != nullptr && strcmp(env, "32") == 0) ? 32 : 16;
+    }();
+    return is_lns32 == (sel == 32);
 }
 
 static ggml_backend_lns_op_support ggml_backend_lns_check_op(const struct ggml_tensor * op) {
@@ -364,7 +383,16 @@ static ggml_backend_lns_op_support ggml_backend_lns_check_op(const struct ggml_t
         }
 
         case GGML_OP_GET_ROWS:
-            return { true, "supported_get_rows" }; // handles any src0 type with to_float
+            // lns_get_rows writes F32 or LNS16 and dequantizes src0 via
+            // to_float — decline anything else (e.g. I32->I32 state-copy
+            // gathers in recurrent models) so it falls back to CPU instead
+            // of hitting the kernel's asserts.
+            return {
+                (op->type == GGML_TYPE_F32 || op->type == GGML_TYPE_LNS16) &&
+                    (src0->type == GGML_TYPE_F32 ||
+                     ggml_get_type_traits(src0->type)->to_float != NULL),
+                "get_rows_requires_f32_or_lns16_dst_and_convertible_src0"
+            };
 
         // CPY/CONT/DUP: only claim ops where at least one side is LNS16.
         // F32->F32, F32->F16, F16->F16 copies involve no LNS arithmetic and are
@@ -393,6 +421,8 @@ static void ggml_backend_lns_audit_op(const struct ggml_tensor * op, ggml_backen
 
     std::fprintf(stderr,
         "{\"event\":\"lns_supports_op\","
+        "\"backend\":\"LNS16\","
+        "\"sum_mode\":\"%s\","
         "\"op\":\"%s\","
         "\"desc\":\"%s\","
         "\"supported\":%s,"
@@ -400,6 +430,7 @@ static void ggml_backend_lns_audit_op(const struct ggml_tensor * op, ggml_backen
         "\"src_types\":[\"%s\",\"%s\",\"%s\",\"%s\"],"
         "\"shape\":[%lld,%lld,%lld,%lld],"
         "\"reason\":\"%s\"}\n",
+        lns16_sum_mode_name(),
         ggml_op_name(op->op),
         ggml_op_desc(op),
         support.supported ? "true" : "false",
@@ -414,6 +445,11 @@ static void ggml_backend_lns_audit_op(const struct ggml_tensor * op, ggml_backen
 
 static bool ggml_backend_lns_device_supports_op(ggml_backend_dev_t dev, const struct ggml_tensor * op) {
     GGML_UNUSED(dev);
+
+    if (!lns_backend_enabled_by_env(/*is_lns32=*/false)) {
+        ggml_backend_lns_audit_op(op, { false, "disabled_by_env" });
+        return false;
+    }
 
     const ggml_backend_lns_op_support support = ggml_backend_lns_check_op(op);
     ggml_backend_lns_audit_op(op, support);
@@ -455,7 +491,7 @@ static const struct ggml_backend_device_i ggml_backend_lns_device_i = {
 // ============================================================
 
 static const char * ggml_backend_lns_reg_get_name(ggml_backend_reg_t reg) {
-    return "LNS";
+    return "LNS16";
 
     GGML_UNUSED(reg);
 }
