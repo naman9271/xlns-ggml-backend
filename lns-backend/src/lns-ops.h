@@ -12,8 +12,9 @@ void f32_to_lns16_row(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
 }
 #endif
 
-// Name of the compile-time summation-variant selection ("base"|"monte"|"lpvip"),
-// used for init logging and the LNS_OP_AUDIT JSON records.
+// Name of the compile-time summation-variant selection
+// ("base"|"monte"|"lpvip"|"sum32"), used for init logging, the device
+// description, and the LNS_OP_AUDIT JSON records.
 const char * lns16_sum_mode_name(void);
 
 // Phase 1

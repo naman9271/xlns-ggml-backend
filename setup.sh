@@ -5,7 +5,7 @@
 #   ./setup.sh                    # end-to-end inference (requires at least one model)
 #   ./setup.sh --unit-test        # also build and run test-lns-backend (standalone ggml)
 #   ./setup.sh --unit-test --skip-inference
-#   ./setup.sh --sum-mode=monte   # xlns16 summation variant: base|monte|lpvip
+#   ./setup.sh --sum-mode=monte   # xlns16 summation variant: base|monte|lpvip|sum32
 #                                 # (compile-time; also settable via LNS16_SUM env)
 #
 # Backends: both LNS16 (xlns16) and LNS32 (xlns32) are built. At runtime the
@@ -45,14 +45,14 @@ for arg in "$@"; do
         --unit-test)         RUN_UNIT_TEST=1 ;;
         --skip-inference)    RUN_INFERENCE=0 ;;
         --sum-mode=*)        LNS16_SUM="${arg#*=}" ;;
-        --sum-mode)          echo "ERROR: use --sum-mode=<base|monte|lpvip> (with '=')" >&2; exit 1 ;;
+        --sum-mode)          echo "ERROR: use --sum-mode=<base|monte|lpvip|sum32> (with '=')" >&2; exit 1 ;;
         *)                   echo "WARNING: ignoring unknown argument '$arg'" >&2 ;;
     esac
 done
 
 case "$LNS16_SUM" in
-    base|monte|lpvip) ;;
-    *) echo "ERROR: --sum-mode must be base, monte, or lpvip (got '$LNS16_SUM')" >&2; exit 1 ;;
+    base|monte|lpvip|sum32) ;;
+    *) echo "ERROR: --sum-mode must be base, monte, lpvip, or sum32 (got '$LNS16_SUM')" >&2; exit 1 ;;
 esac
 
 resolve_model_path() {
@@ -111,6 +111,7 @@ copy_backend() {
     cp "$REPO_ROOT/lns-backend/src/ggml-lns.cpp" "$dest_src/" || return 1
     cp "$REPO_ROOT/lns-backend/src/lns-ops.cpp"  "$dest_src/" || return 1
     cp "$REPO_ROOT/lns-backend/src/lns-ops.h"    "$dest_src/" || return 1
+    cp "$REPO_ROOT/lns-backend/src/lns16-sum32.h" "$dest_src/" || return 1
     cp "$REPO_ROOT/lns-backend/src/CMakeLists.txt" "$dest_src/" || return 1
     cp "$REPO_ROOT/lns-backend/include/ggml-lns.h" "$dest_inc/" || return 1
     cp "$REPO_ROOT/lns-backend/src32/ggml-lns32.cpp" "$dest_src32/" || return 1

@@ -40,11 +40,17 @@
 # Reference binaries: auto-detected from build/llama.cpp/build-ref/bin (a
 # build configured with -DGGML_LNS=OFF -DGGML_LNS32=OFF -DGGML_BLAS=OFF).
 # Override with REF_BIN_DIR=/path/to/bin if you keep it elsewhere.
+#
+# The LNS side defaults to build/llama.cpp/build-lns/bin. Since the summation
+# mode is compile-time, grading a specific mode means pointing at that mode's
+# tree, e.g.
+#   LLAMA_BIN_DIR=build/llama.cpp/build-lns16-sum32/bin \
+#   REF_BIN_DIR=build/llama.cpp/build-ref-v2/bin ./scripts/lns-vs-cpu-quality.sh ...
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LLAMA_BIN_DIR="$REPO_ROOT/build/llama.cpp/build-lns/bin"
+LLAMA_BIN_DIR="${LLAMA_BIN_DIR:-$REPO_ROOT/build/llama.cpp/build-lns/bin}"
 REF_BIN_DIR="${REF_BIN_DIR:-$REPO_ROOT/build/llama.cpp/build-ref/bin}"
 COMPLETION="$LLAMA_BIN_DIR/llama-completion"
 PERPLEXITY="$LLAMA_BIN_DIR/llama-perplexity"
@@ -82,7 +88,7 @@ fi
 for bin in "$COMPLETION" "$PERPLEXITY"; do
     if [ ! -x "$bin" ]; then
         echo "ERROR: $(basename "$bin") not found at $bin" >&2
-        echo "Build with: cmake --build $REPO_ROOT/build/llama.cpp/build-lns --target $(basename "$bin")" >&2
+        echo "Build with: cmake --build $(dirname "$LLAMA_BIN_DIR") --target $(basename "$bin")" >&2
         exit 1
     fi
 done

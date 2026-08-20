@@ -17,8 +17,8 @@
 #include <math.h>
 #include <iostream>
 
-#if defined(GGML_LNS16_SUM_MONTE) && defined(GGML_LNS16_SUM_LPVIP)
-#error "GGML_LNS16_SUM_MONTE and GGML_LNS16_SUM_LPVIP are mutually exclusive (set GGML_LNS16_SUM to one of base|monte|lpvip)"
+#if (defined(GGML_LNS16_SUM_MONTE) + defined(GGML_LNS16_SUM_LPVIP) + defined(GGML_LNS16_SUM_SUM32)) > 1
+#error "GGML_LNS16_SUM_{MONTE,LPVIP,SUM32} are mutually exclusive (set GGML_LNS16_SUM to one of base|monte|lpvip|sum32)"
 #endif
 
 // The xlnscpp .cpp files carry non-inline definitions and mutable global
@@ -52,9 +52,31 @@ using ::sqrt; using ::pow; using ::fabs; using ::abs;
 #endif
 
 #include "xlns16.cpp"          // must be FIRST: defines xlns16_zero, which
-                               // gates the xlns16_*_lpvip32 family below
+                               // gates the xlns16_*_lpvip32 and _sum32 families
+                               // below
 
-#if defined(GGML_LNS16_SUM_LPVIP) || defined(GGML_LNS16_MONTE_BYLPVIP)
+#if defined(GGML_LNS16_SUM_SUM32)
+// Pure xlns32 accumulator. xlns32.cpp has NO include guard and must be pulled
+// in HERE, before xlns32lpvip.cpp: that file bootstraps xlns32.cpp with
+// xlns32_ideal (the libm log/pow adder), and whichever include lands first
+// fixes the configuration for the whole TU. Same config as ggml-lns32's
+// lns32-ops.cpp: xlns32_alt, xlns32_ideal deliberately NOT defined, i.e. the
+// table + interpolation sb / cotransformation db path.
+// NOTE (thread safety): that non-ideal xlns32_sb is a macro writing the
+// globals xlns32_z / xlns32_zh. Safe while graph_compute is single-threaded;
+// must become thread_local if the backend is ever parallelized.
+  #ifndef xlns32_zero
+    #ifndef xlns32_alt
+    #define xlns32_alt
+    #endif
+    #include "xlns32.cpp"
+  #endif
+  #include "lns16-sum32.h"     // xlns16_*_sum32 family (local until upstreamed
+                               // to xlnscpp as xlns16sum32.cpp)
+#endif
+
+#if defined(GGML_LNS16_SUM_LPVIP) || \
+    (defined(GGML_LNS16_SUM_MONTE) && defined(GGML_LNS16_MONTE_BYLPVIP))
 #include "xlns32lpvip.cpp"     // bootstraps xlns32.cpp with xlns32_ideal +
                                // xlns32_aicasb (aicasb is required for
                                // accurate lpvip summation)
@@ -80,8 +102,8 @@ using ::sqrt; using ::pow; using ::fabs; using ::abs;
 // ============================================================
 // Summation-variant selection (compile-time)
 // ============================================================
-// GGML_LNS16_SUM_{MONTE,LPVIP} are set by CMake from GGML_LNS16_SUM.
-// The three families have identical signatures and aliasing guarantees
+// GGML_LNS16_SUM_{MONTE,LPVIP,SUM32} are set by CMake from GGML_LNS16_SUM.
+// The four families have identical signatures and aliasing guarantees
 // (in-place c == a is safe), so the aliases are drop-in at the call sites.
 
 #if defined(GGML_LNS16_SUM_MONTE)
@@ -96,6 +118,12 @@ using ::sqrt; using ::pow; using ::fabs; using ::abs;
   #define LNS16_SOFTMAX_MASKED xlns16_softmax_masked_lpvip32
   #define LNS16_RMS_NORM       xlns16_rms_norm_lpvip32
   #define LNS16_SUM_MODE_NAME  "lpvip"
+#elif defined(GGML_LNS16_SUM_SUM32)
+  #define LNS16_VEC_DOT        xlns16_vec_dot_sum32
+  #define LNS16_SOFTMAX        xlns16_softmax_sum32
+  #define LNS16_SOFTMAX_MASKED xlns16_softmax_masked_sum32
+  #define LNS16_RMS_NORM       xlns16_rms_norm_sum32
+  #define LNS16_SUM_MODE_NAME  "sum32"
 #else
   #define LNS16_VEC_DOT        xlns16_vec_dot
   #define LNS16_SOFTMAX        xlns16_softmax

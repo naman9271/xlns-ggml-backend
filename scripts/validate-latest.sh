@@ -53,6 +53,7 @@ copy_backend() {
     cp "$REPO_ROOT/lns-backend/src/ggml-lns.cpp" "$dest_src/" || return 1
     cp "$REPO_ROOT/lns-backend/src/lns-ops.cpp"  "$dest_src/" || return 1
     cp "$REPO_ROOT/lns-backend/src/lns-ops.h"    "$dest_src/" || return 1
+    cp "$REPO_ROOT/lns-backend/src/lns16-sum32.h" "$dest_src/" || return 1
     cp "$REPO_ROOT/lns-backend/src/CMakeLists.txt" "$dest_src/" || return 1
     cp "$REPO_ROOT/lns-backend/include/ggml-lns.h" "$dest_inc/" || return 1
     cp "$REPO_ROOT/lns-backend/src32/ggml-lns32.cpp" "$dest_src32/" || return 1
@@ -119,7 +120,7 @@ cd "$GGML_DIR/build-lns" || return 1
 
 # Sum-mode selection is compile-time, so the sweep is a rebuild loop
 # (only the ggml-lns target — a single TU — recompiles per mode).
-for mode in base monte lpvip; do
+for mode in base monte sum32 lpvip; do
     log "    Building + testing (sum mode: $mode)"
     cmake .. \
         -DGGML_LNS=ON \
@@ -165,7 +166,7 @@ cd "$LLAMA_DIR/build-lns" || return 1
 # Sum-mode sweep for end-to-end inference (rebuild loop, see unit-test note).
 # The `| tee` pipelines rely on `set -o pipefail` (top of script) so a crashed
 # llama-completion fails the pipeline even though tee exits 0.
-for mode in base monte lpvip; do
+for mode in base monte sum32 lpvip; do
     log "    Building llama-completion (sum mode: $mode)"
     cmake .. \
         -DGGML_LNS=ON \

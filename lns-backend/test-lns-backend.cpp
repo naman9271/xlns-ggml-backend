@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -12,8 +13,10 @@
 //
 // Usage: test-lns-backend [DEVICE] [PROFILE]
 //   DEVICE  — backend device name to test: LNS16 (default) or LNS32
-//   PROFILE — tolerance profile: base (default) | monte | lpvip
-//             (must match the GGML_LNS16_SUM mode the backend was built with;
+//   PROFILE — tolerance profile: base (default) | monte | lpvip | sum32
+//             (must match the GGML_LNS16_SUM mode the backend was built with —
+//             this is cross-checked against the device description, so a
+//             mismatched profile is an error, not a silently wrong grade;
 //             ignored for LNS32, which always uses its own tight profile)
 
 // Per-mode tolerances for the summation-dependent tests. The elementwise
@@ -21,10 +24,11 @@
 // no summation variant touches them.
 struct tol_profile {
     const char * name;
-    float mul_mat;     // scaled error, MUL_MAT reference case
-    float mul_mat_id;  // scaled error, MUL_MAT_ID cases
-    float softmax;     // absolute error on probabilities
-    float rms_norm;    // scaled error
+    float mul_mat;      // scaled error, MUL_MAT reference case
+    float mul_mat_id;   // scaled error, MUL_MAT_ID cases
+    float softmax;      // absolute error on probabilities
+    float rms_norm;     // scaled error
+    float mul_mat_long; // NRMSE, long mixed-sign MUL_MAT (K=1536)
 };
 
 // base:  plain xlns16 accumulation (matches the historical 0.006 matmul gate).
@@ -38,13 +42,31 @@ struct tol_profile {
 // lpvip: 32-bit LPVIP accumulator — slightly looser than base on short sums
 //        (Mitchell-approximated adds, 1.6% observed on the K=2 matmul),
 //        dramatically better on long sums (0.77% observed on rms_norm 576,
-//        vs base's 4%) — which is its purpose.
+//        vs base's 4%) — which is its purpose. NOTE: xlns32_add_lpvip is
+//        inaccurate on mixed-sign cancellation, so its mul_mat_long gate is
+//        wide by necessity, not by choice.
+// sum32: pure xlns32 accumulator (23-bit log fraction) narrowed back to xlns16
+//        with round-to-nearest. Two-term sums come out correctly rounded, and
+//        the ~370-term stagnation of the 16-bit accumulator is gone, so the
+//        residual error is the 16-bit operand/result rounding floor.
 // lns32: 23-bit log fraction, F32-class accuracy
+//
+// The mul_mat_long column gates the only case that can see an accumulator at
+// all (K=1536, mixed signs); every other case is dominated by 16-bit operand
+// rounding. All values are measured-then-set — see results/*/unit-tests-*.txt.
+// Measured on 2026-08-20 (M3, Release, BLAS off), gates set at ~1.5x measured:
+//   mul_mat_long NRMSE   base 4.39%   monte 4.72%   lpvip 57.21%   sum32 0.31%   lns32 0.012%
+//   rms_norm 576         base 4.07%   monte 5.68%   lpvip  0.77%   sum32 0.45%   lns32 0.0012%
+// lpvip's 57% is the known xlns32_add_lpvip mixed-sign cancellation defect, not
+// a threshold anyone should be comfortable with; it is gated wide so the sweep
+// stays green while the defect is documented, and it is exactly why this case
+// exists (all four modes score an identical 0.59% on the K=2 mul_mat above).
 static const tol_profile PROFILES[] = {
-    { "base",  0.006f, 0.02f,  0.02f, 0.06f },
-    { "monte", 0.03f,  0.05f,  0.05f, 0.08f },
-    { "lpvip", 0.02f,  0.03f,  0.02f, 0.02f },
-    { "lns32", 0.001f, 0.001f, 0.001f, 0.001f },
+    { "base",  0.006f, 0.02f,  0.02f, 0.06f,  0.07f  },
+    { "monte", 0.03f,  0.05f,  0.05f, 0.08f,  0.08f  },
+    { "lpvip", 0.02f,  0.03f,  0.02f, 0.02f,  0.75f  },
+    { "sum32", 0.006f, 0.02f,  0.02f, 0.01f,  0.005f },
+    { "lns32", 0.001f, 0.001f, 0.001f, 0.001f, 0.001f },
 };
 
 static tol_profile g_tol = PROFILES[0];
@@ -160,6 +182,93 @@ static bool run_mul_mat_test(ggml_backend_sched_t sched) {
     printf(" ]\n\n");
 
     bool pass = check_close("LNS mul mat", out_data, expected, g_tol.mul_mat);
+    ggml_free(ctx);
+    return pass;
+}
+
+// ============================================================
+// MUL_MAT, long mixed-sign reduction (K = 1536).
+//
+// The reference MUL_MAT case above is K=2: it is blind to the accumulator, so
+// every summation variant scores the same 0.59% there while their long-sum
+// behaviour differs by two orders of magnitude. This case is the one that
+// grades GGML_LNS16_SUM.
+//
+// Operands come from a fixed LCG in [-1,1) (deterministic across runs and
+// platforms — no rand()). The reference is a double-precision dot of the RAW
+// f32 operands, i.e. the same yardstick inference is graded against, so the
+// number below includes the ~0.6% xlns16 operand-rounding floor that no
+// accumulator can remove.
+//
+// Metric: NRMSE over the whole output block. check_close's per-element
+// |err|/max(|expected|,1) is useless here — with mixed-sign operands some dot
+// products cancel to near zero, where any absolute error reads as a huge
+// relative one.
+// ============================================================
+
+static bool run_mul_mat_long_test(ggml_backend_sched_t sched) {
+    const int64_t K = 1536;   // typical n_embd; well past base's ~370-term stall
+    const int64_t M = 8;      // weight rows
+    const int64_t N = 4;      // activation rows
+
+    std::vector<uint8_t> buf;
+    struct ggml_context * ctx = make_context(buf);
+    struct ggml_cgraph  * gf = ggml_new_graph(ctx);
+
+    struct ggml_tensor * a = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, K, M);
+    struct ggml_tensor * b = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, K, N);
+
+    struct ggml_tensor * result = ggml_mul_mat(ctx, a, b);
+    ggml_build_forward_expand(gf, result);
+
+    // Deterministic operands.
+    uint64_t rng = 0x9E3779B97F4A7C15ull;
+    auto next = [&rng]() -> float {
+        rng = rng * 6364136223846793005ull + 1442695040888963407ull;
+        const uint32_t m = (uint32_t)(rng >> 32);
+        return (float)((double)m / 2147483648.0 - 1.0);   // [-1, 1)
+    };
+    std::vector<float> a_data((size_t)M * K), b_data((size_t)N * K);
+    for (auto & v : a_data) v = next();
+    for (auto & v : b_data) v = next();
+
+    ggml_backend_sched_reset(sched);
+    ggml_backend_sched_alloc_graph(sched, gf);
+    ggml_backend_tensor_set(a, a_data.data(), 0, ggml_nbytes(a));
+    ggml_backend_tensor_set(b, b_data.data(), 0, ggml_nbytes(b));
+    ggml_backend_sched_graph_compute(sched, gf);
+
+    struct ggml_tensor * out = ggml_graph_node(gf, -1);
+    std::vector<float> out_data(ggml_nelements(out));
+    ggml_backend_tensor_get(out, out_data.data(), 0, ggml_nbytes(out));
+
+    // Reference: double dot of the raw f32 operands. dst[i0, i1] = A[i0] . B[i1]
+    double sq_err = 0.0, sq_ref = 0.0, max_abs_err = 0.0;
+    for (int64_t i1 = 0; i1 < N; i1++) {
+        for (int64_t i0 = 0; i0 < M; i0++) {
+            double ref = 0.0;
+            for (int64_t k = 0; k < K; k++) {
+                ref += (double)a_data[(size_t)i0 * K + k] * (double)b_data[(size_t)i1 * K + k];
+            }
+            const double got = out_data[(size_t)i1 * M + i0];
+            const double err = got - ref;
+            sq_err += err * err;
+            sq_ref += ref * ref;
+            if (fabs(err) > max_abs_err) max_abs_err = fabs(err);
+        }
+    }
+    const double rms_ref = sqrt(sq_ref / (double)(M * N));
+    const double nrmse   = sqrt(sq_err / sq_ref);
+    const bool pass = nrmse <= (double)g_tol.mul_mat_long;
+
+    printf("LNS mul mat long (K=%lld, mixed sign, %lldx%lld out):\n",
+           (long long)K, (long long)M, (long long)N);
+    printf("  max |err|/rms(ref): %.4f%%   rms(ref): %.4f\n",
+           max_abs_err / rms_ref * 100.0, rms_ref);
+    printf("LNS mul mat long NRMSE: %.4f%% (gate %.4f%%)\n",
+           nrmse * 100.0, (double)g_tol.mul_mat_long * 100.0);
+    printf("LNS mul mat long result: %s\n\n", pass ? "PASS" : "FAIL");
+
     ggml_free(ctx);
     return pass;
 }
@@ -763,7 +872,7 @@ static bool run_one_argsort_case(ggml_backend_sched_t sched, const char * name,
 
 // ============================================================
 // SOFT_MAX: validates the summation-variant dispatch (the
-// normalization sum is the reduction that base/monte/lpvip differ on).
+// normalization sum is the reduction the summation variants differ on).
 // ============================================================
 
 static void soft_max_ref(const float * x, const float * mask, float scale,
@@ -1096,7 +1205,7 @@ int main(int argc, char ** argv) {
     // argv[2] must match the GGML_LNS16_SUM mode the backend was built with.
     const char * profile_name = is_lns32 ? "lns32" : (argc > 2 ? argv[2] : "base");
     if (!is_lns32 && strcmp(profile_name, "lns32") == 0) {
-        fprintf(stderr, "ERROR: profile 'lns32' is reserved for the LNS32 device (use base|monte|lpvip)\n");
+        fprintf(stderr, "ERROR: profile 'lns32' is reserved for the LNS32 device (use base|monte|lpvip|sum32)\n");
         return 1;
     }
     bool profile_found = false;
@@ -1108,7 +1217,7 @@ int main(int argc, char ** argv) {
         }
     }
     if (!profile_found) {
-        fprintf(stderr, "ERROR: unknown tolerance profile '%s' (expected base|monte|lpvip)\n", profile_name);
+        fprintf(stderr, "ERROR: unknown tolerance profile '%s' (expected base|monte|lpvip|sum32)\n", profile_name);
         return 1;
     }
 
@@ -1128,8 +1237,26 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
+    // The LNS16 device description carries the compiled GGML_LNS16_SUM mode.
+    // Refuse to run with a profile that does not match the binary: the
+    // tolerances differ per mode, so a mismatch grades the wrong thing and
+    // either hides a regression or invents one.
+    const char * dev_desc = ggml_backend_dev_description(ggml_backend_get_device(lns_backend));
+    if (!is_lns32) {
+        char expect[64];
+        snprintf(expect, sizeof(expect), "sum=%s", g_tol.name);
+        if (dev_desc == NULL || strstr(dev_desc, expect) == NULL) {
+            fprintf(stderr,
+                    "ERROR: tolerance profile '%s' does not match the backend build (%s).\n"
+                    "       Rebuild with -DGGML_LNS16_SUM=%s, or pass the profile this binary was built with.\n",
+                    g_tol.name, dev_desc ? dev_desc : "<no description>", g_tol.name);
+            return 1;
+        }
+    }
+
     printf("Using backend: %s (tolerance profile: %s)\n",
            ggml_backend_name(lns_backend), g_tol.name);
+    printf("Device: %s\n", dev_desc ? dev_desc : "<none>");
 
     ggml_backend_t cpu_backend = ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, nullptr);
 
@@ -1138,6 +1265,7 @@ int main(int argc, char ** argv) {
 
     bool pass = true;
     pass = run_mul_mat_test(sched) && pass;
+    pass = run_mul_mat_long_test(sched) && pass;
     pass = run_mul_mat_id_test(sched, lns_backend) && pass;
     pass = run_div_test(sched) && pass;
     pass = run_swiglu_test(sched, "LNS swiglu split", true, false) && pass;

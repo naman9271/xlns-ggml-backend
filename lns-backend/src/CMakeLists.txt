@@ -13,14 +13,20 @@ target_compile_definitions(ggml-lns PRIVATE xlns16_table xlns16_alt)
 #   base  — plain sequential xlns16_add accumulation (xlns16.cpp)
 #   monte — Monte-Carlo LNS dithered accumulation (xlns16monte*.cpp)
 #   lpvip — 32-bit LPVIP accumulator, returned as xlns16 (xlns32lpvip.cpp)
-set(GGML_LNS16_SUM "base" CACHE STRING "xlns16 summation variant: base|monte|lpvip")
-set_property(CACHE GGML_LNS16_SUM PROPERTY STRINGS base monte lpvip)
+#   sum32 — pure xlns32 accumulator, rounded back to xlns16 (lns16-sum32.h);
+#           the accuracy ceiling, and the slowest
+set(GGML_LNS16_SUM "base" CACHE STRING "xlns16 summation variant: base|monte|lpvip|sum32")
+set_property(CACHE GGML_LNS16_SUM PROPERTY STRINGS base monte lpvip sum32)
 if(GGML_LNS16_SUM STREQUAL "monte")
     target_compile_definitions(ggml-lns PRIVATE GGML_LNS16_SUM_MONTE)
 elseif(GGML_LNS16_SUM STREQUAL "lpvip")
     target_compile_definitions(ggml-lns PRIVATE GGML_LNS16_SUM_LPVIP)
+elseif(GGML_LNS16_SUM STREQUAL "sum32")
+    # xlns32_alt matches the LNS32 backend: table + interpolation sb,
+    # cotransformation db. xlns32_ideal is intentionally NOT set.
+    target_compile_definitions(ggml-lns PRIVATE GGML_LNS16_SUM_SUM32 xlns32_alt)
 elseif(NOT GGML_LNS16_SUM STREQUAL "base")
-    message(FATAL_ERROR "GGML_LNS16_SUM must be one of: base, monte, lpvip (got '${GGML_LNS16_SUM}')")
+    message(FATAL_ERROR "GGML_LNS16_SUM must be one of: base, monte, lpvip, sum32 (got '${GGML_LNS16_SUM}')")
 endif()
 
 # Which Monte-Carlo implementation backs GGML_LNS16_SUM=monte. The two files
@@ -30,6 +36,10 @@ endif()
 #   ON  — xlns16monte_bylpvip.cpp (same API via xlns32_add_lpvip)
 option(GGML_LNS16_MONTE_BYLPVIP "ggml-lns: implement monte adds via xlns32_add_lpvip" OFF)
 if(GGML_LNS16_MONTE_BYLPVIP)
+    if(NOT GGML_LNS16_SUM STREQUAL "monte")
+        message(WARNING "GGML_LNS16_MONTE_BYLPVIP only affects GGML_LNS16_SUM=monte "
+                        "(current mode: ${GGML_LNS16_SUM}) — it is ignored here")
+    endif()
     target_compile_definitions(ggml-lns PRIVATE GGML_LNS16_MONTE_BYLPVIP)
 endif()
 

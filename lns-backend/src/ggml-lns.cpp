@@ -208,7 +208,13 @@ static const char * ggml_backend_lns_device_get_name(ggml_backend_dev_t dev) {
 }
 
 static const char * ggml_backend_lns_device_get_description(ggml_backend_dev_t dev) {
-    return "Logarithmic Number System (xlns16)";
+    // The compiled summation variant is part of the device identity: it changes
+    // the numerics of every reduction, and a tolerance profile that does not
+    // match the build silently grades the wrong thing. Exposing it here lets
+    // test-lns-backend cross-check its PROFILE argument against the binary.
+    static std::string desc =
+        std::string("Logarithmic Number System (xlns16, sum=") + lns16_sum_mode_name() + ")";
+    return desc.c_str();
 
     GGML_UNUSED(dev);
 }

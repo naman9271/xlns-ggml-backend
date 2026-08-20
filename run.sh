@@ -7,7 +7,7 @@
 #   ./run.sh -m ./other.gguf -n 40
 #   ./run.sh -p "Hello" -- --temp 0.2 # extra args after -- go to llama-completion
 #
-# Summation mode (base|monte|lpvip) is compile-time; rebuild with
+# Summation mode (base|monte|lpvip|sum32) is compile-time; rebuild with
 # ./setup.sh --sum-mode=... to change it.
 
 set -euo pipefail
