@@ -125,6 +125,9 @@ for mode in base monte lpvip; do
         -DGGML_LNS=ON \
         -DGGML_LNS32=ON \
         -DGGML_LNS16_SUM="$mode" \
+        -DGGML_LNS16_MONTE_BYLPVIP=OFF \
+        -DGGML_BLAS=OFF \
+        -DGGML_CPU_REPACK=OFF \
         -DGGML_METAL=OFF \
         -DCMAKE_BUILD_TYPE=Release \
         -DXLNSCPP_DIR="$XLNSCPP_DIR" || return 1
@@ -168,6 +171,8 @@ for mode in base monte lpvip; do
         -DGGML_LNS=ON \
         -DGGML_LNS32=ON \
         -DGGML_LNS16_SUM="$mode" \
+        -DGGML_LNS16_MONTE_BYLPVIP=OFF \
+        -DGGML_BLAS=OFF \
         -DGGML_METAL=OFF \
         -DGGML_CPU_REPACK=OFF \
         -DCMAKE_BUILD_TYPE=Release \

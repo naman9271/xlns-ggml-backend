@@ -220,6 +220,9 @@ run_build_and_test() {
             -DGGML_LNS=ON \
             -DGGML_LNS32=ON \
             -DGGML_LNS16_SUM="$LNS16_SUM" \
+            -DGGML_LNS16_MONTE_BYLPVIP=OFF \
+            -DGGML_BLAS=OFF \
+            -DGGML_CPU_REPACK=OFF \
             -DGGML_METAL=OFF \
             -DCMAKE_BUILD_TYPE=Release \
             -DXLNSCPP_DIR="$XLNSCPP_DIR" || return 1
@@ -250,6 +253,8 @@ run_build_and_test() {
             -DGGML_LNS=ON \
             -DGGML_LNS32=ON \
             -DGGML_LNS16_SUM="$LNS16_SUM" \
+            -DGGML_LNS16_MONTE_BYLPVIP=OFF \
+            -DGGML_BLAS=OFF \
             -DGGML_METAL=OFF \
             -DGGML_CPU_REPACK=OFF \
             -DCMAKE_BUILD_TYPE=Release \
