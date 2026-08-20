@@ -12,3 +12,7 @@ build/
 xlnscpp/
 tools/
 slides/
+
+# Measurement artefacts: raw run outputs, per-run llama.cpp logs, op-audit JSONL,
+# scheduler traces. Regenerable from the scripts; not part of the implementation.
+results/
