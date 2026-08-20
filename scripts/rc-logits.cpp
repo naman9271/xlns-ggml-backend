@@ -1,14 +1,14 @@
 // rc-logits: run ONE forward pass over a prompt, dump the full final-token logit
 // vector to a binary file, and print the top-K.  Links against whichever
 // libllama we point it at, so the same source is built once per backend
-// flavour (build-ref-v2, build-lns16, build-lns16-sum32, ...).
+// flavour (build-ref, build-lns-base, build-lns-sum32, ...).
 //
 // A single generated token is far too noisy to judge a numerics change by, so
 // compare whole logit vectors instead -- rms, correlation, and the rank of the
 // expected token -- with scripts/logit-compare.py.
 //
 // Build one binary per llama.cpp tree, e.g.
-//   T=build/llama.cpp/build-lns16-sum32
+//   T=build/llama.cpp/build-lns-sum32
 //   g++ -O2 -std=c++17 -I build/llama.cpp/include -I build/llama.cpp/ggml/include \
 //       scripts/rc-logits.cpp -o /tmp/rc-logits-sum32 \
 //       -L $T/bin -lllama -lggml -lggml-base -Wl,-rpath,$PWD/$T/bin

@@ -3,49 +3,94 @@
 ## Prerequisites
 
 - `git`, `cmake`, `g++`, `make`, `perl`
-- ~2 GB free disk space (llama.cpp clone + build)
+- `python3` with `numpy` — used by `scripts/logit-compare.py` and the
+  perplexity math in `scripts/lns-vs-cpu-quality.sh`
+- the `hf` CLI for model downloads (`pip install -U huggingface_hub`)
+- Disk: ~2.5 GB for the source clones and the default four-variant build,
+  plus the models you download (0.1–1.1 GB each)
+- Platform: developed and measured on macOS / Apple Silicon (M3, 16 GB).
+  All builds deliberately pass `-DGGML_BLAS=OFF -DGGML_METAL=OFF` so the LNS
+  backends actually execute the math (see the CPU-reference warning below).
+  Linux is untested.
 
 ## Steps
 
-**1. Clone and initialise**
+### 1. Clone and initialise
+
 ```bash
 git clone https://github.com/abracodeabra1/xlns-ggml-backend-final
 cd xlns-ggml-backend-final
-git submodule update --init   # optional — as setup.sh also initialises xlnscpp
+git submodule update --init   # optional — setup.sh also initialises xlnscpp
 ```
 
-`setup.sh` will then advance `xlnscpp/` to latest `origin/main` (falling back to the pinned commit in `patches/xlnscpp-base-commit.txt` if the build fails).
+`setup.sh` uses `xlnscpp/` at the pinned commit in `patches/xlnscpp-base-commit.txt` (which matches the recorded submodule state). Only `./setup.sh --update` advances it to latest `origin/main`.
 
-**2. Download the model**
+### 2. Models: what to download
 
-Download `SmolLM2-135M-Instruct-Q4_K_M.gguf`:
+No `.gguf` ships with the repo (they are gitignored on purpose). Download what
+you need into the repo root:
+
+| Model | Size | Needed for |
+|---|---|---|
+| SmolLM2-135M-Instruct-Q4_K_M | 105 MB | default model for `setup.sh` / `run.sh` — start here |
+| Llama-3.2-1B-Instruct-Q4_K_M | 808 MB | the `MODEL_LLAMA32` runs and `scripts/validate-latest.sh` |
+| DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M | 1.1 GB | reproducing the sum32 rescue ([Model compatibility](#model-compatibility)) |
+| qwen2.5-1.5b-instruct-q4_k_m | 1.1 GB | second model in the robustness grading |
 
 ```bash
-# Using huggingface-cli, in the newer versions, use the hf command instead of huggingface-cli (pip install huggingface_hub if needed)
-huggingface-cli download bartowski/SmolLM2-135M-Instruct-GGUF \
-    SmolLM2-135M-Instruct-Q4_K_M.gguf --local-dir .
+pip install -U huggingface_hub   # provides the `hf` CLI
+hf download bartowski/SmolLM2-135M-Instruct-GGUF SmolLM2-135M-Instruct-Q4_K_M.gguf --local-dir .
+hf download bartowski/Llama-3.2-1B-Instruct-GGUF Llama-3.2-1B-Instruct-Q4_K_M.gguf --local-dir .
+hf download bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf --local-dir .
+hf download Qwen/Qwen2.5-1.5B-Instruct-GGUF qwen2.5-1.5b-instruct-q4_k_m.gguf --local-dir .
 ```
 
-**3. Run**
+qwen2.5 comes from the official Qwen repo — only it uses the lowercase
+filename these docs and artefacts use. On huggingface_hub < 1.0 the older
+`huggingface-cli download` spelling still works; it was removed in v1.0.
+
+### 3. Run
+
 ```bash
-# End-to-end LNS inference on SmolLM2 (default model path is the repo-root .gguf)
-# Runs LNS16 (n=20 tokens) plus a short LNS32 run (n=4; disable with LNS32_INFERENCE=0)
+# Build ALL four xlns16 summation variants + the pure-CPU reference, then run
+# end-to-end LNS inference on SmolLM2 per variant (default model path is the
+# repo-root .gguf). Runs LNS16 (n=20 tokens) per mode plus one short LNS32 run
+# (n=4; disable with LNS32_INFERENCE=0)
 ./setup.sh
 
 # Unit test + SmolLM2 inference (Llama 3.2 only if MODEL_LLAMA32 is set)
 ./setup.sh --unit-test
 
-# Unit test only (no model needed) — runs the LNS16 suite and the LNS32 suite
+# Unit test only (no model needed) — runs the LNS16 suite per sum mode and the LNS32 suite
 ./setup.sh --unit-test --skip-inference
 
-# Select the xlns16 summation variant (compile-time): base (default) | monte | lpvip | sum32
+# Build only ONE summation variant instead of all four: base | monte | lpvip | sum32
 ./setup.sh --sum-mode=lpvip
+
+# Update to latest upstream (the only mode that fetches new upstream work); on
+# success the pins in patches/ are rewritten to the new commits ("last known good")
+./setup.sh --update
+
+# Force-reset the source trees to the pinned commits (discards in-tree edits)
+./setup.sh --clean
 
 # Explicit model paths (MODEL_LLAMA32 enables the Llama 3.2 1B inference run)
 MODEL_SMOLLM=/path/to/SmolLM2-135M-Instruct-Q4_K_M.gguf \
 MODEL_LLAMA32=/path/to/Llama-3.2-1B-Instruct-Q4_K_M.gguf \
 ./setup.sh
 ```
+
+Build layout: one directory per summation mode —
+`build/llama.cpp/build-lns-{base,monte,lpvip,sum32}` (each contains
+`llama-completion` and `llama-perplexity`), plus `build/llama.cpp/build-ref`
+(pure CPU, no LNS/BLAS — the baseline for `scripts/lns-vs-cpu-quality.sh`).
+The LNS trees are also configured with `-DGGML_BLAS=OFF -DGGML_METAL=OFF`,
+since the quality gate refuses BLAS-enabled LNS binaries.
+`build/llama.cpp/build-lns` is a symlink to the first mode built (`base` unless
+`--sum-mode` restricted the set), so older paths keep working. With
+`--unit-test`, the standalone ggml tree gets the same per-mode directories and
+`build-lns` symlink under `build/ggml/` (containing `test-lns-backend`; there
+is no `build-ref` there).
 
 `MODEL=/path/to/model.gguf` remains supported as an alias for `MODEL_SMOLLM`.
 
@@ -54,26 +99,58 @@ backends claims ops — both are always built. `LNS_OP_AUDIT=1` prints one JSON
 line per `supports_op` query (including which backend answered and, for LNS16,
 the compiled sum mode).
 
+## What success looks like
+
+`./setup.sh` ends with `==> Done.` after running inference for every built
+mode. The SmolLM2 LNS16 continuations look like this (`sum32` shown):
+
+```
+The capital of France is Paris. Paris is the political, cultural, and economic center of France. Paris is also the political
+```
+
+LNS16 output *diverging* from the pure-CPU reference after a few tokens while
+staying coherent is expected — xlns16 rounding flips near-tie argmaxes even on
+healthy models. Unit tests (`--unit-test`) print one `... result: PASS` line
+per case (compare against the committed
+`results/sum32-evidence/unit-tests-*.txt`) and abort on any failure.
+
+Approximate wall-clock on an M3 MacBook (the backends are single-threaded):
+
+| Run | Speed |
+|---|---|
+| SmolLM2-135M, LNS16 `base` | ~1.4 s/token (`sum32` ~1.66x slower) |
+| SmolLM2-135M, LNS32 | ~2.9 s/token |
+| Llama-3.2-1B, LNS16 | ~15 s/token |
+| DeepSeek-1.5B, LNS16 | ~17–25 s/token |
+| `llama-perplexity`, 1.5B model, one 256-token chunk | ~20 min |
+
+A first `./setup.sh` run is build-dominated (two clones + five llama.cpp build
+trees) — expect tens of minutes. Later runs skip whatever is already built.
+
 ## Re-run inference
 
 After a successful `./setup.sh`, re-run the model without rebuilding:
 
 ```bash
-./run.sh                          # LNS16, default SmolLM2 + prompt
+./run.sh                          # LNS16, base sum mode, default SmolLM2 + prompt
+./run.sh --sum-mode=sum32         # pick a summation-variant binary
+./run.sh --sum-mode=all -n 8      # same prompt across all four variants, in sequence
 ./run.sh --backend=32             # LNS32; default -n 4
 ./run.sh -m ./other_model_file.gguf -n 40
 ./run.sh -p "Hello" -- --temp 0.2 # extra args after -- go to llama-completion
 ```
 
-`run.sh` uses `build/llama.cpp/build-lns/bin/llama-completion`. If that binary
-is missing, it tells you to run `./setup.sh` first. Summation mode
-(`base` / `monte` / `lpvip` / `sum32`) is compile-time only — change it with
-`./setup.sh --sum-mode=...`, not `./run.sh`.
+`run.sh` selects `build/llama.cpp/build-lns-<mode>/bin/llama-completion`
+(falling back to the legacy `build-lns` symlink if a variant is not built,
+with a note). If no binary exists, it tells you to run `./setup.sh` first.
+Each summation mode is a separate compile-time binary produced by `setup.sh`;
+`run.sh` only chooses among them.
 
 ### `run.sh` flags
 
 | Flag | Default | Meaning |
 |------|---------|---------|
+| `--sum-mode=MODE` | `base` (or `$LNS16_SUM`) | `base`\|`monte`\|`lpvip`\|`sum32`\|`all` — which variant binary; `all` runs every variant in turn |
 | `--backend=16\|32` | `16` (or `$GGML_LNS_BACKEND`) | Which LNS backend claims ops |
 | `-m`, `--model PATH` | `$MODEL` / `$MODEL_SMOLLM` / repo-root SmolLM2 GGUF | Model file |
 | `-p`, `--prompt TEXT` | `The capital of France is` | Prompt |
@@ -81,6 +158,7 @@ is missing, it tells you to run `./setup.sh` first. Summation mode
 | `-h`, `--help` | — | Show usage |
 | `-- …` | — | Forward remaining args to `llama-completion` |
 
+Space-separated forms (`--sum-mode MODE`, `--backend N`) are accepted too.
 Always passed to `llama-completion`: `-fa off -no-cnv`.
 
 Useful env vars: `GGML_LNS_BACKEND`, `MODEL` / `MODEL_SMOLLM`, `LNS_OP_AUDIT=1`.
@@ -106,42 +184,61 @@ of these after `--` on `./run.sh`, or call the binary directly. Full list:
 | `--temp N` | Temperature (default `0.80`) |
 | `--top-k N` / `--top-p N` / `--min-p N` | Sampling controls |
 
-## Model compatibility: the DeepSeek-R1-Distill-Qwen-1.5B case
+## Model compatibility
 
-`DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf` (qwen2 architecture) produces
-incoherent output on LNS16 **with the default `base` summation** while
-SmolLM2-135M and Llama-3.2-1B stay coherent on the same backend.
+All runs greedy (`--temp 0 --seed 1`, `-fa off`); CPU reference = the
+`build-ref` pure-CPU build:
 
-> **Update (2026-08-20): this is a summation problem, and
-> `-DGGML_LNS16_SUM=sum32` fixes it.** With a pure xlns32 accumulator inside
-> the three reduction ops — every operand and every result still stored as
-> 7-fraction-bit xlns16 — DeepSeek is correct: `" Paris"` is the argmax
-> (rank 0), logit rms vs the CPU reference falls 2.099 → 0.603 and correlation
-> rises 0.447 → 0.953. qwen2.5-1.5B is likewise rescued from degenerate to
-> coherent, and Llama-3.2-1B becomes token-identical to the CPU reference.
-> Graded across 3 prompts x 2 models rather than on one token (the mistake this
-> document warns about): **sum32 is coherent in 6/6 combinations, `base` in
-> 0/6** — see `results/2026-08-20/robust-sum32.txt`. Residual error remains, and
-> narrow reference margins can still be lost to the 16-bit *storage* grid rather
-> than to summation: on "The largest planet…" the reference separates
-> `" Jupiter"` from `" Earth"` by 0.82 logits while LNS16 puts both on the same
-> xlns16 code, so the tie-break emits `" Earth"`. Cost: 1.66x slower than `base`.
-> All artefacts are in `results/2026-08-20/`.
->
-> The text below is the 2026-08-18 analysis of the `base` mode and is kept
-> because its bisection method and its warnings still apply. Its conclusion
-> that operand quantization is the limiting factor was **too pessimistic**:
-> the earlier "a wide accumulator is not enough" experiment
-> (`LNS_MM_ROUNDTRIP=1`) only widened `lns_mul_mat`, re-snapped each dot to
-> the xlns16 grid, and had to route `RMS_NORM`/`SOFT_MAX` to CPU rather than
-> accumulate them accurately in-format. `sum32` widens all three reductions at
-> once and clears the bar.
+| Model | LNS16 `base` | LNS16 `sum32` | LNS32 |
+|---|---|---|---|
+| SmolLM2-135M | coherent | coherent | coherent |
+| Llama-3.2-1B | coherent | **token-identical to CPU** | coherent |
+| qwen2.5-1.5B | degenerate | coherent | coherent |
+| DeepSeek-R1-Distill-Qwen-1.5B | degenerate | coherent | coherent |
 
-Conclusion of the original `base`-mode bisection: **the cause is LNS16's
-operand quantization (~0.3–0.5% relative error per matmul operand from
-xlns16's 7 fraction bits), which this model cannot tolerate. It is a precision
-limit of the 16-bit format on this particular model, not a bug in any LNS
-kernel.**
+Graded across 3 prompts x 2 qwen2-family models, `sum32` is coherent in 6/6
+prompt-model combinations, `base` in 0/6 —
+[results/sum32-evidence/robust-sum32.txt](results/sum32-evidence/robust-sum32.txt).
+
+Why the qwen2 family breaks on `base` — two independent consequences of
+xlns16 having only 7 fraction bits:
+
+1. **Sequential summation stagnates.** `xlns16_add(S, t)` returns `S`
+   unchanged once `t/S` drops below half an ULP, so a same-sign running sum
+   saturates after ~370 terms (summing 1.0 forever converges to 369.97 — see
+   [results/sum32-evidence/standalone-sum32-invariants.txt](results/sum32-evidence/standalone-sum32-invariants.txt)).
+   Every reduction in a 1.5B qwen2 model is far past that point (rms_norm
+   n=1536, mat-mul K=1536 and K=8960). This is what `-DGGML_LNS16_SUM=sum32`
+   fixes: each term is widened to xlns32, accumulated with `xlns32_add`, and
+   rounded back to xlns16 once per reduction.
+2. **Some attention scores are not representable.** qwen2 carries per-head
+   attention biases that push |Q·K| to ~2.3e5. xlns16 has constant *relative*
+   precision, so at that magnitude one ULP is ~1230 absolute, while the
+   key-to-key differences softmax must resolve are only ~700 — distinct keys
+   collapse onto the same 16-bit code. No accumulator, however wide, recovers
+   an ordering the storage format cannot express; the `" Jupiter"`/`" Earth"`
+   tie in the README is the same effect.
+
+Practical guidance:
+
+- Prefer `--sum-mode=sum32` on LNS16. For precision-sensitive models run
+  `GGML_LNS_BACKEND=32` (xlns32, ~23 fraction bits, near-f32 — fully coherent
+  and correct on every model above).
+- Always run reasoning-distill models with their chat template
+  (`-cnv --jinja`); raw-completion prompts are off-distribution.
+- To verify a suspected LNS regression quantitatively, use the quality gate
+  (uses the build-ref pure-CPU binaries as reference):
+
+```bash
+# greedy divergence report + perplexity delta vs the CPU reference
+./scripts/lns-vs-cpu-quality.sh -m ./DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf
+# quick SmolLM2-only check (default model), divergence only:
+./scripts/lns-vs-cpu-quality.sh --skip-ppl
+```
+
+Note: perplexity on the LNS backends is single-threaded — one 256-token chunk
+(`-c 256 --chunks 1`, the default) on a 1.5B model takes on the order of 20
+minutes on LNS16.
 
 > **Warning: what counts as a "CPU reference".** Inside the LNS-enabled
 > `llama-completion` binary, neither `--no-op-offload` nor `--device none`
@@ -157,71 +254,11 @@ kernel.**
 > bit-for-bit precisely because both were the same backend, and the wrong
 > conclusion ("not an LNS bug") followed.
 
-Evidence (all runs greedy: `--temp 0 --seed 1`, `-fa off`, raw prompt
-"The capital of France is"; CPU = build-ref):
-
-| Model / config | CPU reference (build-ref) | LNS16 | LNS32 |
-|---|---|---|---|
-| SmolLM2-135M, n=20 | "Paris. Paris is a city that is known for ..." | "Paris. Paris is the political, ..." — coherent, diverges at token ~6 | — |
-| Llama-3.2-1B, n=20 | "Paris. The Eiffel Tower is ..." | "Paris, the capital of Belgium ..." — coherent, diverges early | — |
-| DeepSeek-Qwen-1.5B, n=40 | "Paris, the capital of Italy is Rome, ..." (fully coherent) | "not the only one\" feature ..." (incoherent) | "Paris, the capital" (correct) |
-| DeepSeek, chat template (`-cnv --jinja`), n=60 | "\<think>\</think> The capital of France is Paris." (correct) | degenerate loop | "The capital of France is Paris." (correct) |
-
-Bisection (LNS16, DeepSeek, which op or operand breaks it):
-
-| Experiment | Result |
-|---|---|
-| `LNS_DISABLE_OPS=ADD` / `RMS_NORM` / `SOFT_MAX` / `ROPE` | still incoherent |
-| `LNS_DISABLE_OPS=MUL_MAT` (matmuls on CPU, all else LNS16) | **coherent** |
-| `LNS_DISABLE_OPS=<everything except MUL_MAT>` (only matmuls on LNS16) | degenerate |
-| Only `result_output` / `ffn_down` / `Qcur,Kcur,Vcur,kqv_out` / `ffn_up,ffn_gate` matmuls on CPU | still incoherent (no single matmul group is responsible) |
-| `GGML_LNS16_SUM=lpvip` or `=monte` build | still incoherent |
-| `GGML_LNS16_SUM=sum32` build (2026-08-20) | **coherent** — "Paris, the capital of Spain is Madrid, the capital of Italy is Rome," |
-| `LNS_MM_ROUNDTRIP=1` (operands xlns16-rounded, dot accumulated in f32) | degraded |
-| `LNS_MM_ROUNDTRIP=2` (only weights rounded to xlns16, f32 dot) | degraded |
-| `LNS_MM_ROUNDTRIP=3` (only activations rounded to xlns16, f32 dot) | degraded |
-
-Interpretation:
-
-- `lns_mul_mat` is the culprit class, and no single matmul group (attn / FFN /
-  logits) or accumulation mode is decisive — the damage is the ~0.3–0.5%
-  per-value rounding that xlns16 (1 sign + 8 exp + 7 fraction bits) applies to
-  **both** operands of every matmul, compounding over 28 layers. A standalone
-  roundtrip check of `fp2xlns16`/`xlns162fp` over [1e-4, 10] shows max rel
-  error 0.54%, mean 0.27%, no underflow/saturation/sign bugs — the conversion
-  itself is sound; the model is simply that sensitive.
-
-Why does DeepSeek break while SmolLM2/Llama survive? A decisive control
-experiment, completely outside the LNS backend: rewrite the GGUF with the
-weights rounded through an emulated xlns16 grid (or simply converted by
-llama.cpp itself) and run on the pure-CPU build-ref:
-
-| Model variant (all on pure CPU) | Result |
-|---|---|
-| SmolLM2, weights xlns16-rounded → F16 | "Paris. Paris is a city known for ..." (coherent, ≈ CPU reference) |
-| Llama-3.2-1B, weights xlns16-rounded → F16 | **byte-identical to CPU reference** |
-| DeepSeek, weights xlns16-rounded → F16 | "Paris,@@@@@@..." (degenerate), PPL → NaN |
-| DeepSeek, Q4_K→F16 via `llama-quantize --allow-requantize` (no extra rounding) | same degenerate output, PPL → NaN |
-| DeepSeek, Q4_K→Q8_0 requantize (finer grid, even with `--imatrix`) | same degenerate output, PPL → NaN |
-
-So the difference is in the models, not the kernels: the shipped
-DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M occupies a measure-zero region of weight
-space — *any* re-representation of its weights (even to the strictly finer
-F16/Q8_0) destroys it, while SmolLM2 and Llama-3.2-1B tolerate the same
-treatment without blinking. Q4_K's per-block min/max structure apparently
-preserves exactly the directions this distilled model depends on; xlns16's
-~0.3% per-value grid does not. Llama survives because its function is
-genuinely smooth under weight perturbation (F16 conversion is byte-identical
-in output); DeepSeek's is not.
-
-- LNS32 (xlns32, ~24 fraction bits) is near-f32 and is fully coherent and
-  correct on this model. Use LNS32 for precision-sensitive models.
-
-Debug/bisection knobs (compiled into the LNS16 backend):
+Debug/bisection knobs (LNS16 and LNS32; `LNS_MM_ROUNDTRIP` is LNS16-only):
 
 - `LNS_DISABLE_OPS="ADD,ROPE,..."` — force listed ops (by ggml op name, or by
-  substring of the tensor name, e.g. `ffn_down`, `result_output`) to fall back
-  to CPU. No rebuild needed.
+  substring of the tensor name, e.g. `ffn_down`, `result_output`; substrings
+  are case-sensitive) to fall back to CPU. No rebuild needed.
 - `LNS_MM_ROUNDTRIP=1|2|3` — in `lns_mul_mat`, round operands to xlns16 but
   accumulate the dot product in IEEE float (1=both operands, 2=weights only,
   3=activations only). Isolates operand quantization from LNS accumulation.
@@ -229,35 +266,73 @@ Debug/bisection knobs (compiled into the LNS16 backend):
 - `GGML_SCHED_DEBUG=2` + `-v` — ggml prints which backend every graph node is
   assigned to; the only reliable way to check what actually ran where.
 
-Practical guidance:
+## Regenerating the evidence artefacts
 
-- For DeepSeek-class (precision-sensitive) models, run `GGML_LNS_BACKEND=32`.
-- Always run reasoning-distill models with their chat template
-  (`-cnv --jinja`); raw-completion prompts are off-distribution.
-- To verify a suspected LNS regression quantitatively, use the quality gate
-  (uses the build-ref pure-CPU binaries as reference):
+Everything in `results/sum32-evidence/` can be re-measured:
 
-```bash
-# greedy divergence report + perplexity delta vs the CPU reference
-./scripts/lns-vs-cpu-quality.sh -m ./DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf
-# quick SmolLM2-only check (default model), divergence only:
-./scripts/lns-vs-cpu-quality.sh --skip-ppl
-```
+- `unit-tests-lns16-{base,monte,lpvip,sum32}.txt`, `unit-tests-lns32.txt` —
+  the per-mode `test-lns-backend` output from
+  `./setup.sh --unit-test --skip-inference`.
+- `standalone-sum32-invariants.txt` — the no-ggml standalone check:
 
-Note: perplexity on the LNS backends is single-threaded — a 256-token chunk
-on a 1.5B model takes on the order of 20 minutes on LNS16.
+  ```bash
+  g++ -O2 -std=c++17 -I xlnscpp -I lns-backend/src lns-backend/test-lns16-sum32.cpp -o /tmp/test-lns16-sum32 && /tmp/test-lns16-sum32
+  ```
+
+- `robust-sum32.txt` — for each of the three prompts and two models in the
+  file's header, a greedy run per configuration, e.g.:
+
+  ```bash
+  ./run.sh --sum-mode=sum32 -n 12 -m ./qwen2.5-1.5b-instruct-q4_k_m.gguf \
+      -p "The capital of France is" -- --temp 0 --seed 1
+  ```
+
+  (repeat with `--sum-mode=base`, and against
+  `build/llama.cpp/build-ref/bin/llama-completion` for the reference rows).
+- `deepseek-logit-ladder.txt` — build `scripts/rc-logits.cpp` once per
+  llama.cpp tree and grade with `scripts/logit-compare.py`:
+
+  ```bash
+  T=build/llama.cpp/build-lns-sum32
+  g++ -O2 -std=c++17 -I build/llama.cpp/include -I build/llama.cpp/ggml/include \
+      scripts/rc-logits.cpp -o /tmp/rc-logits-sum32 \
+      -L $T/bin -lllama -lggml -lggml-base -Wl,-rpath,$PWD/$T/bin
+  GGML_LNS_BACKEND=16 /tmp/rc-logits-sum32 ./DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf \
+      "The capital of France is" /tmp/sum32.bin 20
+  python3 scripts/logit-compare.py /tmp/ref.bin /tmp/sum32.bin --token 12095
+  ```
+
+  (`/tmp/ref.bin` comes from the same `rc-logits` built against `build-ref`.
+  Read rms/corr/rank together — a rank 0 reached with a top-1/top-2 gap of
+  0.000 is a coin flip, not a fix.)
+
+Note: the artefact headers name the CPU reference `build-ref-v2` — that was
+the reference build's directory name at measurement time; it is the same
+configuration `setup.sh` now produces at `build/llama.cpp/build-ref`.
 
 ## Upstream integration
 
-`setup.sh` always fetches latest upstream for all three dependencies:
+By default `setup.sh` is pin-first: each dependency is used at the commit
+recorded in `patches/*-base-commit.txt` (cloned on first run; a tree already
+at its pin is left untouched, so manual in-tree experiments survive re-runs).
+`./setup.sh --update` is the only mode that fetches new upstream work — setup
+still clones missing trees on first run, initialises the submodule, and
+fetches once if a pinned commit is absent from the local object store:
 
-| Dependency | Branch | Integration |
-|---|---|---|
-| [xlnscpp](https://github.com/xlnsresearch/xlnscpp) | `origin/main` | submodule init + `git reset --hard` |
-| [ggml](https://github.com/ggml-org/ggml) | `origin/master` | regex edits in [`scripts/integrate-lns.sh`](scripts/integrate-lns.sh) |
-| [llama.cpp](https://github.com/ggml-org/llama.cpp) | `origin/master` | regex edits in [`scripts/integrate-lns.sh`](scripts/integrate-lns.sh) |
+| Dependency | Pin file | `--update` target | Integration |
+|---|---|---|---|
+| [xlnscpp](https://github.com/xlnsresearch/xlnscpp) | `patches/xlnscpp-base-commit.txt` | `origin/main` | submodule init + checkout |
+| [ggml](https://github.com/ggml-org/ggml) | `patches/ggml-base-commit.txt` | `origin/master` | regex edits in [`scripts/integrate-lns.sh`](scripts/integrate-lns.sh) |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | `patches/llama-base-commit.txt` | `origin/master` | regex edits in [`scripts/integrate-lns.sh`](scripts/integrate-lns.sh) |
 
-If regex integration (ggml/llama.cpp) or the subsequent build fails, it falls back to the pinned patches in `patches/` (verified-good commits in `patches/*-base-commit.txt`). If the build fails against latest xlnscpp, it falls back to `patches/xlnscpp-base-commit.txt`.
+If the regex integration fails (in any mode), setup resets that tree to its
+pinned commit and applies `patches/ggml-core.patch` /
+`patches/llama-core.patch`. Under `--update`, if the *build* fails, only
+xlnscpp is rolled back to its pin and the build retried; ggml/llama.cpp remain
+at the fetched HEAD (a build failure in default pin-first mode just errors
+out). When an `--update` run succeeds end-to-end, the pin files and fallback
+patches are rewritten to the new commits ("last known good") — commit the
+`patches/` diff to make the new pins permanent.
 
 To re-validate all three against latest upstream before refreshing the fallback pins
 (requires both GGUFs — defaults to the repo-root SmolLM2 and Llama 3.2 1B paths):
@@ -272,11 +347,4 @@ inference in every configuration, then a Llama 3.2 1B LNS16 run.
 
 ## What is in this repo
 
-| Path | Contents |
-|------|----------|
-| `lns-backend/` | LNS backend sources — `src/` (LNS16: `ggml-lns.cpp`, `lns-ops.cpp`), `src32/` (LNS32: `ggml-lns32.cpp`, `lns32-ops.cpp`), `include/`, and the unit test |
-| `xlnscpp/` | xlnscpp submodule (16-bit and 32-bit LNS library); `setup.sh` advances to latest `main` |
-| `patches/` | Fallback patches + pinned base commits for xlnscpp, ggml, and llama.cpp |
-| `scripts/` | `integrate-lns.sh` (regex integration), `validate-latest.sh` (compatibility gate), `lns-vs-cpu-quality.sh` (LNS-vs-CPU token-match + perplexity gate) |
-| `setup.sh` | Automated build and run script |
-| `run.sh` | Re-run inference after a successful setup (no rebuild) |
+See the [Repository layout](README.md#repository-layout) table in the README.

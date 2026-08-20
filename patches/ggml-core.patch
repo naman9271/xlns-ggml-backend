@@ -1,46 +1,48 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 8f7cb8cd..ad884184 100644
+index 6c7337ed..62bd3a57 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -192,6 +192,7 @@ option(GGML_SCHED_NO_REALLOC                "ggml: disallow reallocations in ggm
+@@ -192,6 +192,8 @@ option(GGML_SCHED_NO_REALLOC                "ggml: disallow reallocations in ggm
  # 3rd party libs / backends
  option(GGML_ACCELERATE                      "ggml: enable Accelerate framework"               ON)
  option(GGML_BLAS                            "ggml: use BLAS"                                  ${GGML_BLAS_DEFAULT})
 +option(GGML_LNS                             "ggml: use LNS (Logarithmic Number System)"       OFF)
++option(GGML_LNS32                           "ggml: use LNS32 (32-bit Logarithmic Number System)" OFF)
  set(GGML_BLAS_VENDOR ${GGML_BLAS_VENDOR_DEFAULT} CACHE STRING
                                              "ggml: BLAS library vendor")
  option(GGML_LLAMAFILE                       "ggml: use LLAMAFILE"                             ${GGML_LLAMAFILE_DEFAULT})
 diff --git a/include/ggml.h b/include/ggml.h
-index f6725265..00000000 100644
+index 35f0c44e..f14175b1 100644
 --- a/include/ggml.h
 +++ b/include/ggml.h
-@@ -429,7 +429,8 @@ extern "C" {
-         GGML_TYPE_MXFP4   = 39, // MXFP4 (1 block)
+@@ -430,7 +430,8 @@ extern "C" {
          GGML_TYPE_NVFP4   = 40, // NVFP4 (4 blocks, E4M3 scale)
          GGML_TYPE_Q1_0    = 41,
--        GGML_TYPE_COUNT   = 42,
-+        GGML_TYPE_LNS16   = 42, // 16-bit Logarithmic Number System (xlns16)
-+        GGML_TYPE_COUNT   = 43,
+         GGML_TYPE_Q2_0    = 42,
+-        GGML_TYPE_COUNT   = 43,
++        GGML_TYPE_LNS16   = 43, // 16-bit Logarithmic Number System (xlns16)
++        GGML_TYPE_COUNT   = 44,
      };
  
      // precision
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index c26c3f14..c4052772 100644
+index 82e9480c..42453c35 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -464,6 +464,7 @@ elseif (GGML_CPU)
+@@ -471,6 +471,8 @@ elseif (GGML_CPU)
  endif()
  
  ggml_add_backend(BLAS)
 +ggml_add_backend(LNS)
++ggml_add_backend(LNS32)
  ggml_add_backend(CANN)
  ggml_add_backend(CUDA)
- ggml_add_backend(HIP)
+ ggml_add_backend(ET)
 diff --git a/src/ggml-backend-reg.cpp b/src/ggml-backend-reg.cpp
-index 8165ae2c..710f9dea 100644
+index e5959467..c366da18 100644
 --- a/src/ggml-backend-reg.cpp
 +++ b/src/ggml-backend-reg.cpp
-@@ -62,10 +62,16 @@
+@@ -62,10 +62,22 @@
  #include "ggml-hexagon.h"
  #endif
  
@@ -50,15 +52,21 @@ index 8165ae2c..710f9dea 100644
  #include "ggml-blas.h"
  #endif
  
-+#ifdef GGML_USE_LNS
++
++                #ifdef GGML_USE_LNS
 +#include "ggml-lns.h"
 +#endif
++
++#ifdef GGML_USE_LNS32
++#include "ggml-lns32.h"
++#endif
++
 +
 +
  #ifdef GGML_USE_RPC
  #include "ggml-rpc.h"
  #endif
-@@ -152,9 +158,15 @@ struct ggml_backend_registry {
+@@ -156,9 +168,21 @@ struct ggml_backend_registry {
  #ifdef GGML_USE_CANN
          register_backend(ggml_backend_cann_reg());
  #endif
@@ -68,18 +76,24 @@ index 8165ae2c..710f9dea 100644
          register_backend(ggml_backend_blas_reg());
  #endif
 +
-+#ifdef GGML_USE_LNS
++
++                #ifdef GGML_USE_LNS
 +        register_backend(ggml_backend_lns_reg());
 +#endif
++
++#ifdef GGML_USE_LNS32
++        register_backend(ggml_backend_lns32_reg());
++#endif
++
 +
  #ifdef GGML_USE_RPC
          register_backend(ggml_backend_rpc_reg());
  #endif
 diff --git a/src/ggml.c b/src/ggml.c
-index 8815c67d..00000000 100644
+index 59191c66..bce3ea31 100644
 --- a/src/ggml.c
 +++ b/src/ggml.c
-@@ -749,6 +749,12 @@ static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
+@@ -764,6 +764,12 @@ static const struct ggml_type_traits type_traits[GGML_TYPE_COUNT] = {
          .to_float                 = (ggml_to_float_t) dequantize_row_nvfp4,
          .from_float_ref           = (ggml_from_float_t)quantize_row_nvfp4_ref,
      },

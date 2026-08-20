@@ -1,0 +1,28 @@
+DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M, prompt "The capital of France is", first token, BLAS-free
+CPU reference = build/llama.cpp/build-ref-v2 (GGML_LNS=OFF GGML_LNS32=OFF GGML_BLAS=OFF)
+Instrument: scripts/rc-logits.cpp + scripts/logit-compare.py (' Paris' = token 12095)
+
+config                                      rms_err     corr   Paris_rk  argmax_tok
+CPU reference (f32)                           0.000   1.0000          0  Paris
+LNS16 base                                    2.099   0.4473       2807  (id 537)
+LNS16 sum32                                   0.603   0.9529          0  Paris
+
+For reference, the 2026-08-18 ladder measured with the same instrument and trees:
+  LNS16 base + MM_ROUNDTRIP=1                 1.457  0.8593        43 known
+  LNS16 + MMrt1 + RMS_NORM,SOFT_MAX->CPU      0.642  0.9517         4 the
+  LNS16 + MUL_MAT,RMS_NORM,SOFT_MAX->CPU      0.309  0.9854         0 Paris
+  LNS16 monte                                 3.535  0.5933       544 a
+  LNS32                                       0.167  0.9979         0 Paris
+The base row above reproduces the recorded 2.099 / 0.4473 / 2807 exactly,
+which validates the promoted instrument against the original investigation.
+
+--- Second prompt, "The largest planet in our solar system is" (added 2026-08-20) ---
+                                           rms      corr   top-1
+CPU reference (f32)                      0.000    1.0000   ' Jupiter' 14.083  (' Earth' 13.261, gap 0.822)
+LNS16 sum32                              0.673    0.9588   ' Jupiter' 13.899  (' Earth' 13.899, gap 0.000)
+
+The reference's 0.82-logit margin collapses to an EXACT TIE on LNS16 -- both
+candidates land on the same 16-bit log code -- so the emitted token is decided
+by tie-breaking, and llama-completion emits " Earth". The correct token is still
+rank 0. This is a storage-resolution effect (H1), not an accumulator effect:
+no accumulator width can separate two values that share an xlns16 code.

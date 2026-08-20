@@ -1,21 +1,52 @@
 # xlns-ggml-backend
 
 GSoC 2026 code for **"Support for Logarithmic Number Systems in Large Language Models"**
-(xlnsresearch / ggml + llama.cpp).
+([xlnsresearch](https://github.com/xlnsresearch) / ggml + llama.cpp).
 
-Two ggml backends built on the [xlnscpp](https://github.com/xlnsresearch/xlnscpp) library:
+In a logarithmic number system (LNS), a value is stored as its sign plus the
+base-2 logarithm of its magnitude, so multiplication and division become integer
+addition and subtraction while addition needs an approximation — see
+[xlnscpp](https://github.com/xlnsresearch/xlnscpp) for the full background.
+
+This repo implements two ggml backends on top of the xlnscpp library and hooks
+them into llama.cpp, so a stock `llama-completion` runs an LLM's compute in LNS
+arithmetic:
 
 - **LNS16** — 16-bit LNS (xlns16) arithmetic, with a compile-time choice of
-  summation algorithm (`base` / `monte` / `lpvip`) for the reduction-heavy ops
-  (softmax, rms_norm, and the vec_dot inside mat-mul).
+  summation algorithm (`base` / `monte` / `lpvip` / `sum32`) for the
+  reduction-heavy ops (softmax, rms_norm, and the vec_dot inside mat-mul).
 - **LNS32** — 32-bit LNS (xlns32) arithmetic, structural parity port of the
   same op set.
 
 ---
 
-## Reproducing the end-to-end inference result
+## Quick start
 
-See [SETUP.md](SETUP.md) for full instructions.
+```bash
+git clone https://github.com/abracodeabra1/xlns-ggml-backend-final
+cd xlns-ggml-backend-final
+git submodule update --init
+
+# Model files are not shipped; download SmolLM2 (105 MB):
+pip install -U huggingface_hub
+hf download bartowski/SmolLM2-135M-Instruct-GGUF SmolLM2-135M-Instruct-Q4_K_M.gguf --local-dir .
+
+./setup.sh                  # clone+build ggml/llama.cpp at pinned commits, run inference per sum mode
+./run.sh --sum-mode=sum32   # re-run a variant without rebuilding
+```
+
+Expected output (SmolLM2, LNS16, `sum32`):
+
+```
+The capital of France is Paris. Paris is the political, cultural, and economic center of France. ...
+```
+
+See [SETUP.md](SETUP.md) for prerequisites, every flag, the other models, and
+what success looks like.
+
+---
+
+## Results at a glance
 
 Tested models: SmolLM2-135M and Llama-3.2-1B are coherent on LNS16/LNS32 at
 temp 0 (continuations diverge from the pure-CPU reference within a few tokens
@@ -24,9 +55,9 @@ temp 0 (continuations diverge from the pure-CPU reference within a few tokens
 Larger qwen2-family models (qwen2.5-1.5B, DeepSeek-R1-Distill-Qwen-1.5B)
 degenerate on LNS16 with the default `base` summation, and the fix is the
 **summation mode, not the storage format**: with `-DGGML_LNS16_SUM=sum32` (a
-pure xlns32 accumulator inside the three reduction ops, every value still
-stored as 7-fraction-bit xlns16) both become coherent, and Llama-3.2-1B
-becomes token-identical to the CPU reference. Measured on
+pure xlns32 accumulator inside the reduction ops, every value still stored as
+7-fraction-bit xlns16) both become coherent, and Llama-3.2-1B becomes
+token-identical to the CPU reference. Measured on
 DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M, first-token logits vs the pure-CPU
 reference (prompt "The capital of France is"):
 
@@ -37,55 +68,23 @@ reference (prompt "The capital of France is"):
 | (LNS32 backend) | 0.167 | 0.998 | 0 | `" Paris"` |
 
 Graded across 3 prompts x 2 models rather than on a single token, sum32 is
-coherent in **6/6** prompt-model combinations where `base` is degenerate in
-**0/6** (`results/2026-08-20/robust-sum32.txt`). It is not a free lunch: the
-residual error is non-zero, and where the reference has a narrow margin the
-16-bit *storage* grid can still collapse it — on "The largest planet in our
-solar system is" the reference separates `" Jupiter"` from `" Earth"` by 0.82
-logits, while on LNS16 both land on the same xlns16 code (gap 0.000) and the
-tie-break emits `" Earth"`. No accumulator width can fix that; it is the
-7-fraction-bit format itself. sum32 also costs ~1.7x in throughput.
+coherent in **6/6** prompt-model combinations where `base` is coherent in
+**0/6** ([results/sum32-evidence/robust-sum32.txt](results/sum32-evidence/robust-sum32.txt)).
+It is not a free lunch: the residual error is non-zero, and where the
+reference has a narrow margin the 16-bit *storage* grid can still collapse it
+— on "The largest planet in our solar system is" the reference separates
+`" Jupiter"` from `" Earth"` by 0.82 logits, while on LNS16 both land on the
+same xlns16 code (gap 0.000) and the tie-break emits `" Earth"`. No
+accumulator width can fix that; it is the 7-fraction-bit format itself. sum32
+also costs ~1.66x in throughput.
 
-Artefacts and the grading instruments are in `results/2026-08-20/` and
-`scripts/rc-logits.cpp` + `scripts/logit-compare.py`. See
-[SETUP.md](SETUP.md#model-compatibility-the-deepseek-r1-distill-qwen-15b-case)
-for the full evidence matrix, the earlier `base`-mode bisection, and a warning
-about what counts as a true CPU reference.
-
----
-
-## Repository structure
-
-```
-lns-backend/
-  include/      Public API headers (ggml-lns.h, ggml-lns32.h)
-  src/          LNS16 backend  (ggml-lns.cpp, lns-ops.h, lns-ops.cpp, CMakeLists.txt)
-  src32/        LNS32 backend  (ggml-lns32.cpp, lns32-ops.h, lns32-ops.cpp, CMakeLists.txt)
-  test-lns-backend.cpp   Validation tests (runs against either backend)
-```
-
----
-
-## Dependencies
-
-| Dependency | Purpose |
-|---|---|
-| [xlnscpp](https://github.com/xlnsresearch/xlnscpp) | C++ LNS library — included as a **git submodule** |
-| [ggml](https://github.com/ggml-org/ggml) | Tensor runtime for the backend and unit test |
-| [llama.cpp](https://github.com/ggml-org/llama.cpp) | End-to-end LLM inference validation |
-
-xlnscpp is included as a git submodule for the initial checkout.  `setup.sh`
-initialises it if needed, then fetches latest `origin/main`.  If the build
-fails against that HEAD, it falls back to the verified-good commit in
-`patches/xlnscpp-base-commit.txt`.
-
-For manual builds without `setup.sh`, populate the submodule first:
-
-```bash
-git submodule update --init
-```
-
-This ensures `#include "xlns16.cpp"` resolves correctly in the backend.
+The evidence artefacts are committed under
+[results/sum32-evidence/](results/sum32-evidence/) and the grading instruments
+are `scripts/rc-logits.cpp` + `scripts/logit-compare.py`;
+[SETUP.md](SETUP.md#regenerating-the-evidence-artefacts) shows how to
+regenerate each file. See the
+[model compatibility](SETUP.md#model-compatibility) section in SETUP.md for
+the per-model table and the root cause.
 
 ---
 
@@ -117,7 +116,7 @@ cmake .. -DGGML_LNS=ON -DGGML_LNS16_SUM=sum32   # base (default xlns16) | monte 
 | `base` | sequential `xlns16_add` (`xlns16.cpp`) | pure 16-bit; ~4% bias observed on an n=576 sum of squares |
 | `monte` | Monte-Carlo LNS dither (`xlns16monte.cpp`) | pure 16-bit; unbiased in expectation, individual reductions can err more than base |
 | `lpvip` | 32-bit LPVIP accumulator (`xlns32lpvip.cpp`) | ~5× better than base on same-sign long sums (0.77% on the same n=576 case), cheaper than a full xlns32 accumulator — but `xlns32_add_lpvip` is inaccurate on mixed-sign cancellation, so it is *worse* than base inside mat-mul (57% vs 4.4% on a K=1536 dot) |
-| `sum32` | pure xlns32 accumulator, rounded back to xlns16 (`lns-backend/src/lns16-sum32.h`) | the accuracy ceiling: two-term sums come out correctly rounded and the ~370-term stagnation disappears (K=1536 dot 0.31%, n=576 sum of squares 0.45%). Also the slowest — see the throughput note below |
+| `sum32` | pure xlns32 accumulator, rounded back to xlns16 (`lns-backend/src/lns16-sum32.h`) | the accuracy ceiling: two-term sums come out correctly rounded and the ~370-term stagnation disappears (K=1536 dot 0.31%, n=576 sum of squares 0.45%). Also the slowest — see the throughput note above |
 
 `sum32` is the option `xlnscpp/summation16bit.MD` describes but does not ship
 ("one could sum such `xlns16` values using an `xlns32` accumulator, but that is
@@ -127,7 +126,7 @@ back to xlns16 with round-to-nearest at the end.  `xlns32_add` is the *only*
 xlns32 arithmetic involved: operands, results and storage stay xlns16
 throughout, and each reduction narrows exactly once.  It uses the same `xlns32_alt` configuration as the
 LNS32 backend (table + interpolation `sb`, cotransformation `db`; no
-`xlns32_ideal`).  Measured cost: roughly 1.7x slower than `base`
+`xlns32_ideal`).  Measured cost: roughly 1.66x slower than `base`
 end-to-end on SmolLM2-135M.
 
 Numbers from `test-lns-backend` (the `mul mat long` case, K=1536 mixed-sign —
@@ -144,9 +143,12 @@ swaps the pure-16-bit LFSR implementation for the `xlns32_add_lpvip`-based one
 (`xlns16monte_bylpvip.cpp`).  The two define identical symbols, so this choice
 is inherently compile-time.
 
-Only these three ops contain reductions; every other implemented op is
-elementwise.  If layernorm (`GGML_OP_NORM`) or `SUM`/`SUM_ROWS`/`MEAN` are
-added later, xlnscpp already ships `_monte`/`_lpvip32` versions of them, and
+The summation variant is used in exactly four places: softmax's normalizer,
+rms_norm's sum of squares, and the vec_dot inside `MUL_MAT` and `MUL_MAT_ID`.
+The remaining implemented ops are elementwise, pairwise (ROPE, the GLU ops),
+data movement (GET_ROWS, CPY/CONT/DUP, views), or a row-wise sort (ARGSORT).
+If layernorm (`GGML_OP_NORM`) or `SUM`/`SUM_ROWS`/`MEAN` are added later,
+xlnscpp already ships `_monte`/`_lpvip32` versions of them, and
 `lns16-sum32.h` ships `xlns16_layernorm_sum32` / `xlns16_sum_sum32`.
 
 The `sum32` family lives in `lns-backend/src/lns16-sum32.h` rather than in
@@ -178,34 +180,106 @@ Two structural caveats:
 
 Both backends register as ACCEL devices sharing the CPU buffer type, so the
 scheduler would give every op to whichever registered first.  The
-`GGML_LNS_BACKEND` env var (`16` default, or `32`) decides which backend
-claims ops; the other declines with audit reason `disabled_by_env`
-(observable with `LNS_OP_AUDIT=1`).
+`GGML_LNS_BACKEND` env var (`16` default, or `32`; any value other than
+exactly `32` selects LNS16) decides which backend claims ops; the other
+declines with audit reason `disabled_by_env` (observable with
+`LNS_OP_AUDIT=1`).
 
-### Core ggml changes (applied automatically by `setup.sh`)
+---
+
+## Dependencies
+
+| Dependency | Purpose |
+|---|---|
+| [xlnscpp](https://github.com/xlnsresearch/xlnscpp) | C++ LNS library — included as a **git submodule** |
+| [ggml](https://github.com/ggml-org/ggml) | Tensor runtime for the backend and unit test |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | End-to-end LLM inference validation |
+
+`setup.sh` uses each dependency at the commit pinned in
+`patches/*-base-commit.txt`; a plain run never fetches upstream.  Only
+`./setup.sh --update` fetches latest (`origin/main` for xlnscpp,
+`origin/master` for ggml/llama.cpp), and it rolls xlnscpp back to its pin if
+the build fails against that HEAD.  See
+[Upstream integration](SETUP.md#upstream-integration) in SETUP.md.
+
+For manual builds without `setup.sh`, populate the submodule first:
+
+```bash
+git submodule update --init
+```
+
+This ensures `#include "xlns16.cpp"` resolves correctly in the backend.
+
+---
+
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `lns-backend/include/` | Public API headers (`ggml-lns.h`, `ggml-lns32.h`) |
+| `lns-backend/src/` | LNS16 backend (`ggml-lns.cpp`, `lns-ops.h`, `lns-ops.cpp`, `lns16-sum32.h`, `CMakeLists.txt`) |
+| `lns-backend/src32/` | LNS32 backend (`ggml-lns32.cpp`, `lns32-ops.h`, `lns32-ops.cpp`, `CMakeLists.txt`) |
+| `lns-backend/test-lns-backend.cpp` | Validation tests (runs against either backend) |
+| `lns-backend/test-lns16-sum32.cpp` | Standalone sum32 invariant checks (needs no ggml) |
+| `xlnscpp/` | xlnscpp submodule (16- and 32-bit LNS library); used at the pinned commit, advanced only by `--update` |
+| `patches/` | Pinned base commits for xlnscpp/ggml/llama.cpp + fallback patches (`ggml-core.patch`, `llama-core.patch`) |
+| `scripts/integrate-lns.sh` | Regex integration of the LNS hooks into ggml/llama.cpp |
+| `scripts/validate-latest.sh` | Compatibility gate against latest upstream |
+| `scripts/lns-vs-cpu-quality.sh` | LNS-vs-CPU token-match + perplexity gate |
+| `scripts/rc-logits.cpp` | Dump one forward pass's final-token logit vector |
+| `scripts/logit-compare.py` | Grade two logit dumps (rms / corr / rank) |
+| `results/sum32-evidence/` | Committed evidence artefacts cited above (bulk logit dumps are not shipped) |
+| `setup.sh` | Automated build and run script |
+| `run.sh` | Re-run inference after a successful setup (no rebuild) |
+| `build/` | Created by `setup.sh` (ggml/llama.cpp clones + build trees); gitignored |
+
+Model `.gguf` files are deliberately gitignored — download them per
+[SETUP.md](SETUP.md#2-models-what-to-download).
+
+---
+
+## Core ggml changes (applied automatically by `setup.sh`)
+
+The LNS hooks are applied by regex (`scripts/integrate-lns.sh`), falling back
+to `patches/ggml-core.patch` / `patches/llama-core.patch` if the regexes no
+longer match.  Paths below are relative to the fetched ggml tree, which
+`setup.sh` keeps at `build/ggml` (and inside llama.cpp's vendored `ggml/`):
 
 | File | Change |
 |---|---|
-| `ggml/include/ggml.h` | Insert `GGML_TYPE_LNS16` at the current `GGML_TYPE_COUNT` value, then bump `GGML_TYPE_COUNT` by 1 |
-| `ggml/src/ggml.c` | Register LNS16 type traits (`blck_size=1`, `type_size=2`, not quantized) |
-| `ggml/CMakeLists.txt` | Add `GGML_LNS` and `GGML_LNS32` CMake options (default OFF) |
-| `ggml/src/CMakeLists.txt` | Add `ggml_add_backend(LNS)` and `ggml_add_backend(LNS32)` |
-| `ggml/src/ggml-backend-reg.cpp` | Add `#ifdef GGML_USE_LNS` / `#ifdef GGML_USE_LNS32` includes and registrations |
+| `include/ggml.h` | Insert `GGML_TYPE_LNS16` at the current `GGML_TYPE_COUNT` value, then bump `GGML_TYPE_COUNT` by 1 |
+| `src/ggml.c` | Register LNS16 type traits (`blck_size=1`, `type_size=2`, not quantized) |
+| `CMakeLists.txt` | Add `GGML_LNS` and `GGML_LNS32` CMake options (default OFF) |
+| `src/CMakeLists.txt` | Add `ggml_add_backend(LNS)` and `ggml_add_backend(LNS32)` |
+| `src/ggml-backend-reg.cpp` | Add `#ifdef GGML_USE_LNS` / `#ifdef GGML_USE_LNS32` includes and registrations |
 
-`setup.sh` fetches latest upstream for xlnscpp (`origin/main`), ggml, and
-llama.cpp (`origin/master`).  For ggml and llama.cpp it applies LNS hooks via
-regex (`scripts/integrate-lns.sh`), falling back to `patches/*.patch` if needed.
-Verified-good commits for all three are recorded in `patches/*-base-commit.txt`.
+### Build and validate
 
-### Build
+The supported path needs no model:
 
 ```bash
-cd ggml/build
-cmake .. -DGGML_LNS=ON -DGGML_LNS32=ON -DGGML_LNS16_SUM=base
-cmake --build . -j4
+./setup.sh --unit-test --skip-inference
+```
+
+It clones ggml at the pinned commit into `build/ggml`, applies the hooks,
+copies the backend sources and the test into the tree, and builds + runs
+`test-lns-backend` once per summation mode plus once for LNS32.
+
+The manual equivalent, after `setup.sh` has prepared `build/ggml` at least
+once.  Every flag matters: BLAS and Metal default ON on macOS, and a
+BLAS-enabled "LNS" build silently runs its mat-muls on BLAS — exactly the
+contamination `scripts/lns-vs-cpu-quality.sh` refuses:
+
+```bash
+cmake -S build/ggml -B build/ggml/build-lns-base \
+  -DGGML_LNS=ON -DGGML_LNS32=ON -DGGML_LNS16_SUM=base \
+  -DGGML_LNS16_MONTE_BYLPVIP=OFF -DGGML_BLAS=OFF -DGGML_METAL=OFF \
+  -DGGML_CPU_REPACK=OFF -DCMAKE_BUILD_TYPE=Release -DXLNSCPP_DIR=$PWD/xlnscpp
+cmake --build build/ggml/build-lns-base --target test-lns-backend -j4
 
 # Validate (per backend; second arg = tolerance profile, which MUST match the
 # GGML_LNS16_SUM the binary was built with — a mismatch is refused, not graded)
+cd build/ggml/build-lns-base
 GGML_LNS_BACKEND=16 ./bin/test-lns-backend LNS16 base
 GGML_LNS_BACKEND=32 ./bin/test-lns-backend LNS32
 ```
@@ -213,10 +287,11 @@ GGML_LNS_BACKEND=32 ./bin/test-lns-backend LNS32
 ### End-to-end inference (SmolLM2-135M-Instruct, Q4_K_M)
 
 ```bash
-# This assumes SmolLM2 .gguf is in the repo root; setup.sh uses it by default
-./setup.sh                       # LNS16 (base) + a short LNS32 run
-./setup.sh --sum-mode=lpvip      # LNS16 with LPVIP summation
-./setup.sh --sum-mode=sum32      # LNS16 with a pure xlns32 accumulator
+# Builds all four LNS16 sum-mode variants + the pure-CPU reference (build-ref),
+# then runs SmolLM2 per mode (n=20) plus one short LNS32 run (n=4)
+./setup.sh
+./setup.sh --sum-mode=lpvip      # build/run only ONE variant
+./setup.sh --sum-mode=sum32
 
 # Or with Llama 3.2 1B as well
 MODEL_LLAMA32=./Llama-3.2-1B-Instruct-Q4_K_M.gguf ./setup.sh
@@ -230,3 +305,26 @@ MODEL_LLAMA32=./Llama-3.2-1B-Instruct-Q4_K_M.gguf ./setup.sh
 ggml/llama.cpp: unit tests for all four sum modes plus LNS32, SmolLM2
 inference in every configuration, then Llama 3.2 1B (LNS16). Both GGUFs are
 required — see [SETUP.md](SETUP.md).
+
+---
+
+## Limitations and future work
+
+- **Throughput.** The backends are scalar and single-threaded; `sum32` adds
+  another ~1.66x on top of LNS16 `base`, and LNS32 pays a libm `log()` per
+  weight element. This is a numerics research vehicle, not a fast backend.
+- **`lpvip` is inaccurate on mixed-sign cancellation** (57% NRMSE on the
+  K=1536 dot), which makes it unusable inside mat-mul even though its
+  same-sign reductions beat `base`.
+- **No xlns32 conversion table / per-tensor weight cache** — documented future
+  work for the LNS32 backend; there is also no `GGML_TYPE_LNS32` (tensors
+  flow as F32).
+- **Unimplemented ops**: layernorm (`GGML_OP_NORM`), `SUM`, `SUM_ROWS`,
+  `MEAN` fall back to CPU; the summation building blocks for them already
+  exist (see the summation-variants section).
+- **Upstreaming**: the `sum32` family is written to move to
+  `xlnscpp/xlns16sum32.cpp` verbatim.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

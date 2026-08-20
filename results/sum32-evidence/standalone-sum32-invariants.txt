@@ -1,0 +1,20 @@
+sum32 standalone checks (xlns16_table + xlns16_alt, xlns32_alt)
+
+roundtrip narrow(widen(x)) over all 65536      PASS
+  two-term vs correctly-rounded (n=199984): base max 1 ULP (mean 0.025), sum32 max 0 ULP (mean 0.000)
+two-term sum32 no worse than xlns16_add        PASS
+  N=128    exact 128      base     128.6950 (  0.54%)  sum32     128.0000 ( 0.00%)
+  N=370    exact 370      base     369.9663 (  0.01%)  sum32     369.9663 ( 0.01%)
+  N=512    exact 512      base     369.9663 ( 27.74%)  sum32     512.0000 ( 0.00%)
+  N=1536   exact 1536     base     369.9663 ( 75.91%)  sum32    1537.0380 ( 0.07%)
+  N=8960   exact 8960     base     369.9663 ( 95.87%)  sum32    8933.4395 ( 0.30%)
+  N=65536  exact 65536    base     369.9663 ( 99.44%)  sum32   65536.0000 ( 0.00%)
+sum32 does not stagnate (rel err < 1%)         PASS
+  K=1536  mean rel err: base   6.807%  sum32  0.157%  (sum32 better in 62/64)
+  K=8960  mean rel err: base  17.061%  sum32  0.198%  (sum32 better in 64/64)
+sum32 beats base on long mixed-sign dots       PASS
+  n=576   max rel err: base  1.572%  sum32 0.065%
+  n=1536  max rel err: base 23.746%  sum32 0.187%
+sum32 rms_norm beats base                      PASS
+
+ALL PASS

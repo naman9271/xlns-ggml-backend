@@ -34,8 +34,9 @@
 # Exit code: 0 if (unless --skip-ppl) every relative PPL delta is within
 # --ppl-tol percent.
 #
-# NOTE: perplexity on the LNS backends is single-threaded and slow — a 512-token
-# eval on a 1.5B model takes ~20 min on LNS16. Keep the eval text short.
+# NOTE: perplexity on the LNS backends is single-threaded and slow — one
+# 256-token chunk (-c 256 --chunks 1, the default) on a 1.5B model takes
+# ~20 min on LNS16. Keep the eval text short.
 #
 # Reference binaries: auto-detected from build/llama.cpp/build-ref/bin (a
 # build configured with -DGGML_LNS=OFF -DGGML_LNS32=OFF -DGGML_BLAS=OFF).
@@ -44,8 +45,7 @@
 # The LNS side defaults to build/llama.cpp/build-lns/bin. Since the summation
 # mode is compile-time, grading a specific mode means pointing at that mode's
 # tree, e.g.
-#   LLAMA_BIN_DIR=build/llama.cpp/build-lns16-sum32/bin \
-#   REF_BIN_DIR=build/llama.cpp/build-ref-v2/bin ./scripts/lns-vs-cpu-quality.sh ...
+#   LLAMA_BIN_DIR=build/llama.cpp/build-lns-sum32/bin ./scripts/lns-vs-cpu-quality.sh ...
 
 set -euo pipefail
 

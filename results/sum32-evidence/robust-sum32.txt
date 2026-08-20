@@ -1,0 +1,32 @@
+Multi-prompt robustness check for GGML_LNS16_SUM=sum32
+greedy (--temp 0 --seed 1), -fa off -no-cnv, n=12; CPU ref = build-ref-v2
+sum32 rows re-measured 2026-08-20 after rms_norm was changed to scale by 1/n
+in xlns16 (see lns16-sum32.h); ref/base rows are unchanged, that code did not move.
+
+##### MODEL: DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf
+### PROMPT: The capital of France is
+  ref   : The capital of France is Paris, the capital of Italy is Rome, the capital of  
+  base  : The capital of France is not the only one" feature, and I've heard a  
+  sum32 : The capital of France is Paris, the capital of Spain is Madrid, the capital of
+### PROMPT: Water boils at a temperature of
+  ref   : Water boils at a temperature of T degrees Celsius, and water freezes at 0 degrees Celsius  
+  base  : Water boils at a temperature of than water? (i.e., water) what is the  
+  sum32 : Water boils at a temperature of T and pressure P, where T is the boiling point of
+### PROMPT: The largest planet in our solar system is
+  ref   : The largest planet in our solar system is Jupiter, which has a radius of 69,0  
+  base  : The largest planet in our solar system is... Suppose $Zeta$ one is the largest planet in  
+  sum32 : The largest planet in our solar system is Earth, the second largest is Mars, the third is...
+##### MODEL: qwen2.5-1.5b-instruct-q4_k_m.gguf
+### PROMPT: The capital of France is
+  ref   : The capital of France is Paris. The capital of Italy is Rome. The capital of  
+  base  : The capital of France is $F\_2016\) and the capital  
+  sum32 : The capital of France is Paris. The capital of France is also the capital of which
+### PROMPT: Water boils at a temperature of
+  ref   : Water boils at a temperature of 212 degrees Fahrenheit and water freezes at 3  
+  base  : Water boils at a temperature of of  100000000  
+  sum32 : Water boils at a temperature of 212 degrees Fahrenheit and water freezes at a temperature
+### PROMPT: The largest planet in our solar system is
+  ref   : The largest planet in our solar system is the gas giant, Jupiter. It is the fifth planet from  
+  base  : The largest planet in our solar system is Jupiter. It is 1.6 times 10  
+  sum32 : The largest planet in our solar system is the gas giant, Jupiter. It is the 5th
+ROBUST_DONE

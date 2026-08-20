@@ -19,7 +19,7 @@ coin flip, not a fix.
 Usage:
     python3 scripts/logit-compare.py REF.bin CAND.bin [--token ID] [--topk N]
 
-REF.bin is the pure-CPU reference (build-ref-v2). --token pins the expected
+REF.bin is the pure-CPU reference (build-ref). --token pins the expected
 token id (DeepSeek-R1-Distill-Qwen " Paris" is 12095); without it, the
 reference's own argmax is used.
 

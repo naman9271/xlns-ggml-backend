@@ -9,10 +9,13 @@ __pycache__/
 *.gguf
 
 build/
-xlnscpp/
 tools/
 slides/
 
 # Measurement artefacts: raw run outputs, per-run llama.cpp logs, op-audit JSONL,
-# scheduler traces. Regenerable from the scripts; not part of the implementation.
-results/
+# scheduler traces. Not part of the implementation. Exception: the small text
+# evidence files cited by README.md/SETUP.md ship under results/sum32-evidence/.
+results/*
+!results/sum32-evidence/
+results/sum32-evidence/*
+!results/sum32-evidence/*.txt

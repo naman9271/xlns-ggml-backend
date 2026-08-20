@@ -1,0 +1,174 @@
+ggml-lns: LNS16 backend initialized (sum mode: lpvip)
+Using backend: LNS16 (tolerance profile: lpvip)
+Device: Logarithmic Number System (xlns16, sum=lpvip)
+LNS mul mat (4 x 3):
+[ 59.65 54.70 50.16 109.40
+ 90.02 53.53 53.53 124.58
+ 41.95 29.19 27.80 62.97 ]
+
+LNS mul mat max scaled error: 1.6114%
+LNS mul mat result: PASS
+
+LNS mul mat long (K=1536, mixed sign, 8x4 out):
+  max |err|/rms(ref): 122.6148%   rms(ref): 14.2184
+LNS mul mat long NRMSE: 57.2137% (gate 75.0000%)
+LNS mul mat long result: PASS
+
+LNS mul_mat_id non-broadcast max scaled error: 2.3691%
+LNS mul_mat_id non-broadcast result: PASS
+
+LNS mul_mat_id broadcast ne11=1 max scaled error: 1.6549%
+LNS mul_mat_id broadcast ne11=1 result: PASS
+
+LNS mul_mat_id partial broadcast ne11=2 max scaled error: 1.7662%
+LNS mul_mat_id partial broadcast ne11=2 result: PASS
+
+LNS mul_mat_id dst=LNS16 max scaled error: 1.6549%
+LNS mul_mat_id dst=LNS16 result: PASS
+
+LNS div: [ 4.000000 -2.000000 -4.994404 0.250000 1.000000 -2.497202 14.280130 0.500000 ]
+
+LNS div max scaled error: 0.1119%
+LNS div result: PASS
+
+LNS div scalar broadcast: [ 4.000000 -2.985816 2.497202 0.500000 0.250000 -0.125000 ]
+
+LNS div scalar broadcast max scaled error: 0.4728%
+LNS div scalar broadcast result: PASS
+
+LNS div 2d broadcast: [ 4.000000 5.971631 2.497202 -1.000000 2.000000 2.000000 4.481751 -2.985816 0.500000 -2.000000 2.985816 4.000000 ]
+
+LNS div 2d broadcast max scaled error: 0.4728%
+LNS div 2d broadcast result: PASS
+
+LNS swiglu split (4 x 2):
+[ -0.071949 0.539380 0.000000 1.765788
+ -1.221846 -0.754582 0.983886 -0.478802 ]
+
+LNS swiglu split max scaled error: 0.3682%
+LNS swiglu split result: PASS
+
+LNS swiglu fused (4 x 2):
+[ -0.071949 0.539380 0.000000 1.765788
+ -1.221846 -0.754582 0.983886 -0.478802 ]
+
+LNS swiglu fused max scaled error: 0.3682%
+LNS swiglu fused result: PASS
+
+LNS swiglu fused swapped (4 x 2):
+[ -0.071949 0.539380 0.000000 1.765788
+ -1.221846 -0.754582 0.983886 -0.478802 ]
+
+LNS swiglu fused swapped max scaled error: 0.3682%
+LNS swiglu fused swapped result: PASS
+
+LNS geglu split (4 x 2):
+[ 0.000000 0.320718 0.000000 1.957144
+ -1.391424 -0.617576 1.000000 -0.085101 ]
+
+LNS geglu split max scaled error: 0.5821%
+LNS geglu split result: PASS
+
+LNS geglu fused (4 x 2):
+[ 0.000000 0.320718 0.000000 1.957144
+ -1.391424 -0.617576 1.000000 -0.085101 ]
+
+LNS geglu fused max scaled error: 0.5821%
+LNS geglu fused result: PASS
+
+LNS geglu fused swapped (4 x 2):
+[ 0.000000 0.320718 0.000000 1.957144
+ -1.391424 -0.617576 1.000000 -0.085101 ]
+
+LNS geglu fused swapped max scaled error: 0.5821%
+LNS geglu fused swapped result: PASS
+
+LNS tanh: [ -1.000000 -0.902227 -0.460992 -0.008158 0.000000 0.460992 0.902227 1.000000 ]
+
+LNS tanh max scaled error: 0.2921%
+LNS tanh result: PASS
+
+LNS clamp: [ -1.000000 -1.000000 0.000000 0.500000 2.000000 2.000000 ]
+
+LNS clamp max scaled error: 0.0000%
+LNS clamp result: PASS
+
+LNS clamp +inf max: [ -1.000000 -1.000000 0.000000 0.500000 2.000000 9.988808 ]
+
+LNS clamp +inf max max scaled error: 0.1119%
+LNS clamp +inf max result: PASS
+
+LNS clamp -inf min: [ -4.994404 -1.000000 0.000000 0.500000 2.000000 2.000000 ]
+
+LNS clamp -inf min max scaled error: 0.1119%
+LNS clamp -inf min result: PASS
+
+LNS clamp min>max: [ 2.000000 2.000000 2.000000 2.000000 2.000000 2.000000 ]
+
+LNS clamp min>max max scaled error: 0.0000%
+LNS clamp min>max result: PASS
+
+LNS clamp 2d: [ -1.000000 -1.000000 0.000000 0.500000 2.000000 2.000000 ]
+
+LNS clamp 2d max scaled error: 0.0000%
+LNS clamp 2d result: PASS
+
+LNS softmax short max abs error: 0.002018
+LNS softmax short result: PASS
+
+LNS softmax long max abs error: 0.000361
+LNS softmax long result: PASS
+
+LNS softmax scaled max abs error: 0.000074
+LNS softmax scaled result: PASS
+
+LNS softmax masked max abs error: 0.004318
+LNS softmax masked result: PASS
+
+LNS softmax masked scaled max abs error: 0.000129
+LNS softmax masked scaled result: PASS
+
+LNS rms_norm short max scaled error: 1.2722%
+LNS rms_norm short result: PASS
+
+LNS rms_norm 576 max scaled error: 0.7656%
+LNS rms_norm 576 result: PASS
+
+LNS argsort asc: [ 4 1 3 0 2 ]
+
+LNS argsort asc result: PASS
+
+LNS argsort desc: [ 2 0 3 1 4 ]
+
+LNS argsort desc result: PASS
+
+LNS argsort zeros asc: [ 3 0 1 4 2 ]
+
+LNS argsort zeros asc result: PASS
+
+LNS argsort zeros desc: [ 2 4 1 0 3 ]
+
+LNS argsort zeros desc result: PASS
+
+LNS argsort 2d asc: [ 1 0 2 1 2 0 ]
+
+LNS argsort 2d asc result: PASS
+
+LNS argsort 2d desc: [ 2 0 1 0 2 1 ]
+
+LNS argsort 2d desc result: PASS
+
+LNS argsort dups asc: [ 0 2 1 4 3 ]
+
+LNS argsort dups asc result: PASS
+
+LNS argsort dups desc: [ 3 1 4 0 2 ]
+
+LNS argsort dups desc result: PASS
+
+LNS add bias broadcast (qwen2) max scaled error: 1.6432%
+LNS add bias broadcast (qwen2) result: PASS
+
+LNS rope neox full-dim (qwen2) max scaled error: 0.7887%
+LNS rope neox full-dim (qwen2) result: PASS
+
