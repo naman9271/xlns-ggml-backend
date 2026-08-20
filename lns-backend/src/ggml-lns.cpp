@@ -471,10 +471,22 @@ static bool ggml_backend_lns_device_supports_op(ggml_backend_dev_t dev, const st
         size_t pos = 0;
         while (pos <= disabled.size()) {
             const size_t comma = disabled.find(',', pos);
-            const std::string tok = disabled.substr(pos, comma == std::string::npos ? std::string::npos : comma - pos);
+            std::string tok = disabled.substr(pos, comma == std::string::npos ? std::string::npos : comma - pos);
+            // Trim surrounding blanks so "MUL_MAT, RMS_NORM" disables both rather
+            // than silently ignoring the second token.
+            const size_t first = tok.find_first_not_of(" \t");
+            tok = (first == std::string::npos)
+                      ? std::string()
+                      : tok.substr(first, tok.find_last_not_of(" \t") - first + 1);
+            // Empty tokens MUST be skipped: strstr(name, "") returns name and is
+            // never NULL, so a stray leading/trailing/doubled comma would match
+            // every op and route the whole graph to CPU — an unlabelled pure-CPU
+            // run masquerading as a bisection result.
             // match against the op name ("MUL_MAT") or, failing that, as a
             // case-sensitive substring of the tensor name ("ffn_down", "result_output")
-            if (strcasecmp(tok.c_str(), name) == 0 || (op->name[0] != '\0' && strstr(op->name, tok.c_str()) != NULL)) {
+            if (!tok.empty() &&
+                (strcasecmp(tok.c_str(), name) == 0 ||
+                 (op->name[0] != '\0' && strstr(op->name, tok.c_str()) != NULL))) {
                 return false;
             }
             if (comma == std::string::npos) {
