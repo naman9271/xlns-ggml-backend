@@ -46,48 +46,6 @@ what success looks like.
 
 ---
 
-## Results at a glance
-
-Tested models: SmolLM2-135M and Llama-3.2-1B are coherent on LNS16/LNS32 at
-temp 0 (continuations diverge from the pure-CPU reference within a few tokens
-— xlns16 rounding flips some argmaxes — but stay coherent).
-
-Larger qwen2-family models (qwen2.5-1.5B, DeepSeek-R1-Distill-Qwen-1.5B)
-degenerate on LNS16 with the default `base` summation, and the fix is the
-**summation mode, not the storage format**: with `-DGGML_LNS16_SUM=sum32` (a
-pure xlns32 accumulator inside the reduction ops, every value still stored as
-7-fraction-bit xlns16) both become coherent, and Llama-3.2-1B becomes
-token-identical to the CPU reference. Measured on
-DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M, first-token logits vs the pure-CPU
-reference (prompt "The capital of France is"):
-
-| LNS16 mode | logit rms | corr | rank of `" Paris"` | argmax |
-|---|---|---|---|---|
-| `base` | 2.099 | 0.447 | 2807 | wrong |
-| `sum32` | **0.603** | **0.953** | **0** | `" Paris"` |
-| (LNS32 backend) | 0.167 | 0.998 | 0 | `" Paris"` |
-
-Graded across 3 prompts x 2 models rather than on a single token, sum32 is
-coherent in **6/6** prompt-model combinations where `base` is coherent in
-**0/6** ([results/sum32-evidence/robust-sum32.txt](results/sum32-evidence/robust-sum32.txt)).
-It is not a free lunch: the residual error is non-zero, and where the
-reference has a narrow margin the 16-bit *storage* grid can still collapse it
-— on "The largest planet in our solar system is" the reference separates
-`" Jupiter"` from `" Earth"` by 0.82 logits, while on LNS16 both land on the
-same xlns16 code (gap 0.000) and the tie-break emits `" Earth"`. No
-accumulator width can fix that; it is the 7-fraction-bit format itself. sum32
-also costs ~1.66x in throughput.
-
-The evidence artefacts are committed under
-[results/sum32-evidence/](results/sum32-evidence/) and the grading instruments
-are `scripts/rc-logits.cpp` + `scripts/logit-compare.py`;
-[SETUP.md](SETUP.md#regenerating-the-evidence-artefacts) shows how to
-regenerate each file. See the
-[model compatibility](SETUP.md#model-compatibility) section in SETUP.md for
-the per-model table and the root cause.
-
----
-
 ## LNS16 backend
 
 A proper `ggml_backend` (taking inspiration from the BLAS and CPU backends) that performs all
@@ -116,7 +74,7 @@ cmake .. -DGGML_LNS=ON -DGGML_LNS16_SUM=sum32   # base (default xlns16) | monte 
 | `base` | sequential `xlns16_add` (`xlns16.cpp`) | pure 16-bit; ~4% bias observed on an n=576 sum of squares |
 | `monte` | Monte-Carlo LNS dither (`xlns16monte.cpp`) | pure 16-bit; unbiased in expectation, individual reductions can err more than base |
 | `lpvip` | 32-bit LPVIP accumulator (`xlns32lpvip.cpp`) | ~5× better than base on same-sign long sums (0.77% on the same n=576 case), cheaper than a full xlns32 accumulator — but `xlns32_add_lpvip` is inaccurate on mixed-sign cancellation, so it is *worse* than base inside mat-mul (57% vs 4.4% on a K=1536 dot) |
-| `sum32` | pure xlns32 accumulator, rounded back to xlns16 (`lns-backend/src/lns16-sum32.h`) | the accuracy ceiling: two-term sums come out correctly rounded and the ~370-term stagnation disappears (K=1536 dot 0.31%, n=576 sum of squares 0.45%). Also the slowest — see the throughput note above |
+| `sum32` | pure xlns32 accumulator, rounded back to xlns16 (`lns-backend/src/lns16-sum32.h`) | the accuracy ceiling: two-term sums come out correctly rounded and the ~370-term stagnation disappears (K=1536 dot 0.31%, n=576 sum of squares 0.45%). Also the slowest — see the throughput note below |
 
 `sum32` is the option `xlnscpp/summation16bit.MD` describes but does not ship
 ("one could sum such `xlns16` values using an `xlns32` accumulator, but that is
@@ -228,7 +186,7 @@ This ensures `#include "xlns16.cpp"` resolves correctly in the backend.
 | `scripts/lns-vs-cpu-quality.sh` | LNS-vs-CPU token-match + perplexity gate |
 | `scripts/rc-logits.cpp` | Dump one forward pass's final-token logit vector |
 | `scripts/logit-compare.py` | Grade two logit dumps (rms / corr / rank) |
-| `results/sum32-evidence/` | Committed evidence artefacts cited above (bulk logit dumps are not shipped) |
+| `results/sum32-evidence/` | Committed evidence artefacts for the summation-mode measurements (see [SETUP.md](SETUP.md#regenerating-the-evidence-artefacts); bulk logit dumps are not shipped) |
 | `setup.sh` | Automated build and run script |
 | `run.sh` | Re-run inference after a successful setup (no rebuild) |
 | `build/` | Created by `setup.sh` (ggml/llama.cpp clones + build trees); gitignored |
@@ -307,23 +265,6 @@ inference in every configuration, then Llama 3.2 1B (LNS16). Both GGUFs are
 required — see [SETUP.md](SETUP.md).
 
 ---
-
-## Limitations and future work
-
-- **Throughput.** The backends are scalar and single-threaded; `sum32` adds
-  another ~1.66x on top of LNS16 `base`, and LNS32 pays a libm `log()` per
-  weight element. This is a numerics research vehicle, not a fast backend.
-- **`lpvip` is inaccurate on mixed-sign cancellation** (57% NRMSE on the
-  K=1536 dot), which makes it unusable inside mat-mul even though its
-  same-sign reductions beat `base`.
-- **No xlns32 conversion table / per-tensor weight cache** — documented future
-  work for the LNS32 backend; there is also no `GGML_TYPE_LNS32` (tensors
-  flow as F32).
-- **Unimplemented ops**: layernorm (`GGML_OP_NORM`), `SUM`, `SUM_ROWS`,
-  `MEAN` fall back to CPU; the summation building blocks for them already
-  exist (see the summation-variants section).
-- **Upstreaming**: the `sum32` family is written to move to
-  `xlnscpp/xlns16sum32.cpp` verbatim.
 
 ## License
 

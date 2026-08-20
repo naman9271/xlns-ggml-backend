@@ -216,8 +216,12 @@ xlns16 having only 7 fraction bits:
    precision, so at that magnitude one ULP is ~1230 absolute, while the
    key-to-key differences softmax must resolve are only ~700 — distinct keys
    collapse onto the same 16-bit code. No accumulator, however wide, recovers
-   an ordering the storage format cannot express; the `" Jupiter"`/`" Earth"`
-   tie in the README is the same effect.
+   an ordering the storage format cannot express. The same storage-grid effect
+   shows up even under `sum32`: on "The largest planet in our solar system is"
+   the CPU reference separates `" Jupiter"` from `" Earth"` by 0.82 logits,
+   while LNS16 lands both on the same xlns16 code (gap 0.000) and the
+   tie-break emits `" Earth"` (see
+   [results/sum32-evidence/robust-sum32.txt](results/sum32-evidence/robust-sum32.txt)).
 
 Practical guidance:
 
