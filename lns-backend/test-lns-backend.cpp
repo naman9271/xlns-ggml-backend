@@ -929,6 +929,129 @@ static bool run_rms_norm_test(ggml_backend_sched_t sched) {
     return pass;
 }
 
+// ============================================================
+// ADD with broadcast bias: the qwen2 QKV-bias pattern —
+// ggml_add(mul_mat_out [D, n_tokens], bias [D]) with dim-0 broadcast.
+// No other test exercises lns_add (or broadcasting ADD) at all.
+// ============================================================
+
+static bool run_add_bias_test(ggml_backend_sched_t sched) {
+    // qwen2-1.5B shapes: D = n_embd = 1536 (Q) / n_embd_gqa = 256 (K,V)
+    constexpr int64_t D = 1536, NT = 4;
+
+    std::vector<float> a((size_t)(D * NT));
+    std::vector<float> bias((size_t)D);
+    std::vector<float> expected((size_t)(D * NT));
+
+    for (int64_t i = 0; i < D * NT; i++) {
+        a[(size_t)i] = 4.0f * ((float)((i * 29 + 7) % 101) / 101.0f - 0.5f); // [-2,2)
+    }
+    for (int64_t i = 0; i < D; i++) {
+        bias[(size_t)i] = 2.0f * ((float)((i * 13 + 3) % 89) / 89.0f - 0.5f); // [-1,1)
+    }
+    for (int64_t t = 0; t < NT; t++) {
+        for (int64_t i = 0; i < D; i++) {
+            expected[(size_t)(t * D + i)] = a[(size_t)(t * D + i)] + bias[(size_t)i];
+        }
+    }
+
+    std::vector<uint8_t> buf;
+    struct ggml_context * ctx = make_context(buf);
+    struct ggml_cgraph  * gf = ggml_new_graph(ctx);
+
+    struct ggml_tensor * ta = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, D, NT);
+    struct ggml_tensor * tb = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, D);
+    struct ggml_tensor * result = ggml_add(ctx, ta, tb);
+    ggml_build_forward_expand(gf, result);
+
+    ggml_backend_sched_reset(sched);
+    ggml_backend_sched_alloc_graph(sched, gf);
+    ggml_backend_tensor_set(ta, a.data(), 0, ggml_nbytes(ta));
+    ggml_backend_tensor_set(tb, bias.data(), 0, ggml_nbytes(tb));
+    ggml_backend_sched_graph_compute(sched, gf);
+
+    struct ggml_tensor * out = ggml_graph_node(gf, -1);
+    std::vector<float> out_data(ggml_nelements(out));
+    ggml_backend_tensor_get(out, out_data.data(), 0, ggml_nbytes(out));
+
+    // 0.1: loose enough for xlns16 add rounding (incl. near-cancellation of
+    // ~2-magnitude operands), tight enough to catch stride/broadcast bugs.
+    bool pass = check_close("LNS add bias broadcast (qwen2)", out_data, expected.data(), 0.1f);
+    ggml_free(ctx);
+    return pass;
+}
+
+// ============================================================
+// ROPE with full-dim NEOX rotation: the qwen2 pattern —
+// n_rot == head_dim == 128, mode == NEOX, freq_base = 10000.
+// (llama-arch models use the same NEOX mode but with n_rot == 64.)
+// ============================================================
+
+static void rope_neox_ref(const float * x, const int32_t * pos, float * out,
+                          int64_t head_dim, int64_t n_heads, int64_t n_tokens,
+                          int32_t n_dims, float freq_base, float attn_factor) {
+    for (int64_t t = 0; t < n_tokens; t++) {
+        for (int64_t h = 0; h < n_heads; h++) {
+            const float * row = x + (t * n_heads + h) * head_dim;
+            float * orow = out + (t * n_heads + h) * head_dim;
+            for (int32_t j = 0; j < n_dims / 2; j++) {
+                const float theta = powf(freq_base, -2.0f * (float)j / (float)n_dims);
+                const float c = cosf(pos[t] * theta), s = sinf(pos[t] * theta);
+                const float x0 = row[j], x1 = row[j + n_dims / 2];
+                orow[j]              = attn_factor * (x0 * c - x1 * s);
+                orow[j + n_dims / 2] = attn_factor * (x0 * s + x1 * c);
+            }
+            for (int64_t j = n_dims; j < head_dim; j++) {
+                orow[j] = row[j]; // non-rotated passthrough
+            }
+        }
+    }
+}
+
+static bool run_rope_test(ggml_backend_sched_t sched) {
+    constexpr int64_t HEAD_DIM = 128, N_HEADS = 2, N_TOKENS = 3;
+    constexpr int32_t N_DIMS = 128; // full-dim rotation (qwen2)
+    constexpr float FREQ_BASE = 10000.0f, ATTN_FACTOR = 1.0f;
+
+    const int64_t n = HEAD_DIM * N_HEADS * N_TOKENS;
+    std::vector<float> a((size_t)n);
+    for (int64_t i = 0; i < n; i++) {
+        a[(size_t)i] = 2.0f * ((float)((i * 31 + 11) % 97) / 97.0f - 0.5f); // [-1,1)
+    }
+    const int32_t pos[N_TOKENS] = { 0, 3, 17 };
+
+    std::vector<float> expected((size_t)n);
+    rope_neox_ref(a.data(), pos, expected.data(), HEAD_DIM, N_HEADS, N_TOKENS,
+                  N_DIMS, FREQ_BASE, ATTN_FACTOR);
+
+    std::vector<uint8_t> buf;
+    struct ggml_context * ctx = make_context(buf);
+    struct ggml_cgraph  * gf = ggml_new_graph(ctx);
+
+    struct ggml_tensor * ta = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, HEAD_DIM, N_HEADS, N_TOKENS);
+    struct ggml_tensor * tp = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, N_TOKENS);
+    struct ggml_tensor * result = ggml_rope_ext(ctx, ta, tp, nullptr,
+                                                N_DIMS, GGML_ROPE_TYPE_NEOX, 4096,
+                                                FREQ_BASE, 1.0f, 0.0f, ATTN_FACTOR,
+                                                32.0f, 1.0f);
+    ggml_build_forward_expand(gf, result);
+
+    ggml_backend_sched_reset(sched);
+    ggml_backend_sched_alloc_graph(sched, gf);
+    ggml_backend_tensor_set(ta, a.data(), 0, ggml_nbytes(ta));
+    ggml_backend_tensor_set(tp, pos, 0, ggml_nbytes(tp));
+    ggml_backend_sched_graph_compute(sched, gf);
+
+    struct ggml_tensor * out = ggml_graph_node(gf, -1);
+    std::vector<float> out_data(ggml_nelements(out));
+    ggml_backend_tensor_get(out, out_data.data(), 0, ggml_nbytes(out));
+
+    // 0.1: two muls + a sub per rotated pair in xlns16 (see add-bias note).
+    bool pass = check_close("LNS rope neox full-dim (qwen2)", out_data, expected.data(), 0.1f);
+    ggml_free(ctx);
+    return pass;
+}
+
 static bool run_argsort_test(ggml_backend_sched_t sched) {
     constexpr int n = 5;
     const float a[n] = { 3.0f, -1.0f, 4.0f, 1.5f, -5.0f };
@@ -1028,6 +1151,8 @@ int main(int argc, char ** argv) {
     pass = run_soft_max_test(sched) && pass;
     pass = run_rms_norm_test(sched) && pass;
     pass = run_argsort_test(sched) && pass;
+    pass = run_add_bias_test(sched) && pass;
+    pass = run_rope_test(sched) && pass;
 
     ggml_backend_sched_free(sched);
     ggml_backend_free(lns_backend);

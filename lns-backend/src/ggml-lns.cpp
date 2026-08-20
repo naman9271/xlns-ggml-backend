@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <strings.h>
+#include <string>
 
 // ============================================================
 // Backend context
@@ -453,7 +455,35 @@ static bool ggml_backend_lns_device_supports_op(ggml_backend_dev_t dev, const st
 
     const ggml_backend_lns_op_support support = ggml_backend_lns_check_op(op);
     ggml_backend_lns_audit_op(op, support);
-    return support.supported;
+    if (!support.supported) {
+        return false;
+    }
+
+    // LNS_DISABLE_OPS="ADD,ROPE,..." — force the named ops to fall back to CPU.
+    // Bisection aid: e.g. LNS_DISABLE_OPS=ADD isolates the effect of the bias
+    // ADD kernel without rebuilding the backend.
+    static const std::string disabled = []() {
+        const char * env = std::getenv("LNS_DISABLE_OPS");
+        return env ? std::string(env) : std::string();
+    }();
+    if (!disabled.empty()) {
+        const char * name = ggml_op_name(op->op);
+        size_t pos = 0;
+        while (pos <= disabled.size()) {
+            const size_t comma = disabled.find(',', pos);
+            const std::string tok = disabled.substr(pos, comma == std::string::npos ? std::string::npos : comma - pos);
+            // match against the op name ("MUL_MAT") or, failing that, as a
+            // case-sensitive substring of the tensor name ("ffn_down", "result_output")
+            if (strcasecmp(tok.c_str(), name) == 0 || (op->name[0] != '\0' && strstr(op->name, tok.c_str()) != NULL)) {
+                return false;
+            }
+            if (comma == std::string::npos) {
+                break;
+            }
+            pos = comma + 1;
+        }
+    }
+    return true;
 }
 
 static bool ggml_backend_lns_device_supports_buft(ggml_backend_dev_t dev, ggml_backend_buffer_type_t buft) {

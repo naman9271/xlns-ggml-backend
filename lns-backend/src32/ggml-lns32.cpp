@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <strings.h>
+#include <string>
 
 // ============================================================
 // Backend context
@@ -436,7 +438,33 @@ static bool ggml_backend_lns32_device_supports_op(ggml_backend_dev_t dev, const 
 
     const ggml_backend_lns32_op_support support = ggml_backend_lns32_check_op(op);
     ggml_backend_lns32_audit_op(op, support);
-    return support.supported;
+    if (!support.supported) {
+        return false;
+    }
+
+    // LNS_DISABLE_OPS="ADD,ROPE,..." — force the named ops to fall back to CPU.
+    // Bisection aid, same semantics as the LNS16 backend: tokens match either
+    // the ggml op name (case-insensitive) or a substring of the tensor name.
+    static const std::string disabled = []() {
+        const char * env = std::getenv("LNS_DISABLE_OPS");
+        return env ? std::string(env) : std::string();
+    }();
+    if (!disabled.empty()) {
+        const char * name = ggml_op_name(op->op);
+        size_t pos = 0;
+        while (pos <= disabled.size()) {
+            const size_t comma = disabled.find(',', pos);
+            const std::string tok = disabled.substr(pos, comma == std::string::npos ? std::string::npos : comma - pos);
+            if (strcasecmp(tok.c_str(), name) == 0 || (op->name[0] != '\0' && strstr(op->name, tok.c_str()) != NULL)) {
+                return false;
+            }
+            if (comma == std::string::npos) {
+                break;
+            }
+            pos = comma + 1;
+        }
+    }
+    return true;
 }
 
 static bool ggml_backend_lns32_device_supports_buft(ggml_backend_dev_t dev, ggml_backend_buffer_type_t buft) {

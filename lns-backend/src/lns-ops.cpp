@@ -176,6 +176,34 @@ static inline void write_elem_xlns16(void * row, int64_t i, enum ggml_type type,
 // dst:  F32 or LNS16 depending on dst->type
 // ============================================================
 
+// LNS_MM_ROUNDTRIP: bisection aid — quantize operands to xlns16, convert
+// straight back to float, accumulate in IEEE float.
+//   1 = round both operands
+//   2 = round weights only (activations kept f32)
+//   3 = round activations only (weights kept f32)
+// If coherent in mode 1, the failure is in xlns16 accumulation; if still
+// incoherent, the 16-bit operand quantization alone is fatal. Modes 2/3
+// isolate which operand's rounding does the damage.
+static int lns_mm_roundtrip_mode() {
+    static const int v = []() {
+        const char * env = getenv("LNS_MM_ROUNDTRIP");
+        return env ? atoi(env) : 0;
+    }();
+    return v;
+}
+
+static float lns_mm_dot_roundtrip(const xlns16 * a, const xlns16 * b,
+                                  const float * a_f32, const float * b_f32,
+                                  int64_t K, int mode) {
+    float sum = 0.0f;
+    for (int64_t i = 0; i < K; i++) {
+        const float av = (mode == 3) ? a_f32[i] : xlns162fp(a[i]);
+        const float bv = (mode == 2) ? b_f32[i] : xlns162fp(b[i]);
+        sum += av * bv;
+    }
+    return sum;
+}
+
 void lns_mul_mat(struct ggml_tensor * dst) {
     const struct ggml_tensor * src0 = dst->src[0];
     const struct ggml_tensor * src1 = dst->src[1];
@@ -186,12 +214,17 @@ void lns_mul_mat(struct ggml_tensor * dst) {
     const int64_t K = ne00;
     GGML_ASSERT(ne10 == K);
 
+    const int mm_rt_mode = lns_mm_roundtrip_mode();
+
     std::vector<float>  f32_scratch(K);
     std::vector<xlns16> a_row_lns(K);
     // Pre-converted activation rows for one (i12,i13) batch slice: ne11 rows of K.
     // Converting src1 once per slice (rather than once per weight row) so this avoids
     // re-converting each weight row ne11 times.
     std::vector<xlns16> b_lns((size_t)ne11 * (size_t)K);
+    // F32 row copies for roundtrip modes 2/3 (see lns_mm_roundtrip_mode).
+    std::vector<float>  a_row_f32(mm_rt_mode == 3 ? (size_t)K : 0);
+    std::vector<float>  b_f32(mm_rt_mode == 2 ? (size_t)ne11 * (size_t)K : 0);
 
     const int64_t r2 = ne12 / ne02;
     const int64_t r3 = ne13 / ne03;
@@ -204,6 +237,20 @@ void lns_mul_mat(struct ggml_tensor * dst) {
                     + i1*nb11 + i12*nb12 + i13*nb13;
                 row_to_xlns16(b_row_raw, src1->type, b_lns.data() + (size_t)i1 * (size_t)K,
                               f32_scratch.data(), K);
+                if (mm_rt_mode == 2) {
+                    float * bf = b_f32.data() + (size_t)i1 * (size_t)K;
+                    const xlns16 * bl = b_lns.data() + (size_t)i1 * (size_t)K;
+                    if (src1->type == GGML_TYPE_F32) {
+                        memcpy(bf, b_row_raw, (size_t)K * sizeof(float));
+                    } else if (src1->type == GGML_TYPE_LNS16) {
+                        for (int64_t i = 0; i < K; i++) {
+                            bf[i] = xlns162fp(bl[i]);
+                        }
+                    } else {
+                        // scratch holds the dequantized f32 row produced by row_to_xlns16
+                        memcpy(bf, f32_scratch.data(), (size_t)K * sizeof(float));
+                    }
+                }
             }
 
             for (int64_t i0 = 0; i0 < ne01; i0++) {
@@ -211,10 +258,31 @@ void lns_mul_mat(struct ggml_tensor * dst) {
                 const void * a_row_raw = (const char *)src0->data
                     + i0*nb01 + (i12/r2)*nb02 + (i13/r3)*nb03;
                 row_to_xlns16(a_row_raw, type0, a_row_lns.data(), f32_scratch.data(), K);
+                if (mm_rt_mode == 3) {
+                    if (type0 == GGML_TYPE_F32) {
+                        memcpy(a_row_f32.data(), a_row_raw, (size_t)K * sizeof(float));
+                    } else if (type0 == GGML_TYPE_LNS16) {
+                        // weights already xlns16 — best available f32 is the roundtrip
+                        for (int64_t i = 0; i < K; i++) {
+                            a_row_f32[(size_t)i] = xlns162fp(a_row_lns[(size_t)i]);
+                        }
+                    } else {
+                        memcpy(a_row_f32.data(), f32_scratch.data(), (size_t)K * sizeof(float));
+                    }
+                }
 
                 for (int64_t i1 = 0; i1 < ne11; i1++) {
-                    xlns16 dot = LNS16_VEC_DOT(a_row_lns.data(),
-                                               b_lns.data() + (size_t)i1 * (size_t)K, K);
+                    xlns16 dot;
+                    if (mm_rt_mode != 0) {
+                        dot = fp2xlns16(lns_mm_dot_roundtrip(a_row_lns.data(),
+                                                             b_lns.data() + (size_t)i1 * (size_t)K,
+                                                             a_row_f32.data(),
+                                                             b_f32.empty() ? nullptr : b_f32.data() + (size_t)i1 * (size_t)K,
+                                                             K, mm_rt_mode));
+                    } else {
+                        dot = LNS16_VEC_DOT(a_row_lns.data(),
+                                            b_lns.data() + (size_t)i1 * (size_t)K, K);
+                    }
 
                     // Write result: keep as xlns16 if dst is LNS16, else convert to F32
                     void * dst_ptr = (char *)dst->data + i0*nb0 + i1*nb1 + i12*nb2 + i13*nb3;
