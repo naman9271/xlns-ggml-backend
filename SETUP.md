@@ -7,7 +7,7 @@
   perplexity math in `scripts/lns-vs-cpu-quality.sh`
 - the `hf` CLI for model downloads (`pip install -U huggingface_hub`)
 - Disk: ~2.5 GB for the source clones and the default four-variant build,
-  plus the models you download (0.1–1.1 GB each)
+  plus the models you download (0.1–10 GB each)
 - Platform: developed and measured on macOS / Apple Silicon (M3, 16 GB).
   All builds deliberately pass `-DGGML_BLAS=OFF -DGGML_METAL=OFF` so the LNS
   backends actually execute the math (see the CPU-reference warning below).
@@ -35,19 +35,20 @@ you need into the repo root:
 | SmolLM2-135M-Instruct-Q4_K_M | 105 MB | default model for `setup.sh` / `run.sh` — start here |
 | Llama-3.2-1B-Instruct-Q4_K_M | 808 MB | the `MODEL_LLAMA32` runs and `scripts/validate-latest.sh` |
 | DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M | 1.1 GB | reproducing the sum32 rescue ([Model compatibility](#model-compatibility)) |
-| qwen2.5-1.5b-instruct-q4_k_m | 1.1 GB | second model in the robustness grading |
+| gemma-2-2b-it-Q4_K_M | 1.7 GB | additional model for the robustness grading |
+| DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M | 10.4 GB | additional model for the robustness grading |
 
 ```bash
 pip install -U huggingface_hub   # provides the `hf` CLI
 hf download bartowski/SmolLM2-135M-Instruct-GGUF SmolLM2-135M-Instruct-Q4_K_M.gguf --local-dir .
 hf download bartowski/Llama-3.2-1B-Instruct-GGUF Llama-3.2-1B-Instruct-Q4_K_M.gguf --local-dir .
 hf download bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf --local-dir .
-hf download Qwen/Qwen2.5-1.5B-Instruct-GGUF qwen2.5-1.5b-instruct-q4_k_m.gguf --local-dir .
+hf download bartowski/gemma-2-2b-it-GGUF gemma-2-2b-it-Q4_K_M.gguf --local-dir .
+hf download bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf --local-dir .
 ```
 
-qwen2.5 comes from the official Qwen repo — only it uses the lowercase
-filename these docs and artefacts use. On huggingface_hub < 1.0 the older
-`huggingface-cli download` spelling still works; it was removed in v1.0.
+On huggingface_hub < 1.0 the older `huggingface-cli download` spelling still
+works; it was removed in v1.0.
 
 ### 3. Run
 
@@ -193,8 +194,9 @@ All runs greedy (`--temp 0 --seed 1`, `-fa off`); CPU reference = the
 |---|---|---|---|
 | SmolLM2-135M | coherent | coherent | coherent |
 | Llama-3.2-1B | coherent | **token-identical to CPU** | coherent |
-| qwen2.5-1.5B | degenerate | coherent | coherent |
+| gemma-2-2b-it | coherent | coherent | coherent |
 | DeepSeek-R1-Distill-Qwen-1.5B | degenerate | coherent | coherent |
+| DeepSeek-Coder-V2-Lite-Instruct | coherent | coherent | coherent |
 
 Graded across 3 prompts x 2 qwen2-family models, `sum32` is coherent in 6/6
 prompt-model combinations, `base` in 0/6 —
@@ -287,7 +289,9 @@ Everything in `results/sum32-evidence/` can be re-measured:
   file's header, a greedy run per configuration, e.g.:
 
   ```bash
-  ./run.sh --sum-mode=sum32 -n 12 -m ./qwen2.5-1.5b-instruct-q4_k_m.gguf \
+  ./run.sh --sum-mode=sum32 -n 12 -m ./gemma-2-2b-it-Q4_K_M.gguf \
+      -p "The capital of France is" -- --temp 0 --seed 1
+  ./run.sh --sum-mode=sum32 -n 12 -m ./DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf \
       -p "The capital of France is" -- --temp 0 --seed 1
   ```
 
