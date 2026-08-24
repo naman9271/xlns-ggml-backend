@@ -18,8 +18,8 @@
 ### 1. Clone and initialise
 
 ```bash
-git clone https://github.com/abracodeabra1/xlns-ggml-backend-final
-cd xlns-ggml-backend-final
+git clone https://github.com/xlnsresearch/xlns-ggml-backend
+cd xlns-ggml-backend
 git submodule update --init   # optional — setup.sh also initialises xlnscpp
 ```
 

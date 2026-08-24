@@ -23,8 +23,8 @@ arithmetic:
 ## Quick start
 
 ```bash
-git clone https://github.com/abracodeabra1/xlns-ggml-backend-final
-cd xlns-ggml-backend-final
+git clone https://github.com/xlnsresearch/xlns-ggml-backend
+cd xlns-ggml-backend
 git submodule update --init
 
 # Model files are not shipped; download SmolLM2 (105 MB):
