@@ -25,7 +25,7 @@ arithmetic:
 ```bash
 git clone https://github.com/xlnsresearch/xlns-ggml-backend
 cd xlns-ggml-backend
-git submodule update --init
+git submodule update --init   # optional — setup.sh also initialises the submodules
 
 # Model files are not shipped; download SmolLM2 (105 MB):
 pip install -U huggingface_hub
@@ -150,6 +150,7 @@ declines with audit reason `disabled_by_env` (observable with
 | Dependency | Purpose |
 |---|---|
 | [xlnscpp](https://github.com/xlnsresearch/xlnscpp) | C++ LNS library — included as a **git submodule** |
+| [xlnscuda](https://github.com/xlnsresearch/xlnscuda) | CUDA LNS backend — included as a **git submodule** |
 | [ggml](https://github.com/ggml-org/ggml) | Tensor runtime for the backend and unit test |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | End-to-end LLM inference validation |
 
@@ -180,6 +181,7 @@ This ensures `#include "xlns16.cpp"` resolves correctly in the backend.
 | `lns-backend/test-lns-backend.cpp` | Validation tests (runs against either backend) |
 | `lns-backend/test-lns16-sum32.cpp` | Standalone sum32 invariant checks (needs no ggml) |
 | `xlnscpp/` | xlnscpp submodule (16- and 32-bit LNS library); used at the pinned commit, advanced only by `--update` |
+| `xlnscuda/` | xlnscuda submodule (CUDA LNS implementation) |
 | `patches/` | Pinned base commits for xlnscpp/ggml/llama.cpp + fallback patches (`ggml-core.patch`, `llama-core.patch`) |
 | `scripts/integrate-lns.sh` | Regex integration of the LNS hooks into ggml/llama.cpp |
 | `scripts/validate-latest.sh` | Compatibility gate against latest upstream |
