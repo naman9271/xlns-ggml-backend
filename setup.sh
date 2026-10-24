@@ -11,6 +11,9 @@
 #                                 # success rewrite the pins in patches/ (last known good)
 #   ./setup.sh --clean            # force-reset the source trees to the pins first
 #                                 # (discards any manual in-tree edits)
+#   ./setup.sh --cuda             # also build the LNSCUDA16/LNSCUDA32 GPU backends
+#                                 # (xlnscuda; needs nvcc), test them against the
+#                                 # CPU backends and run GPU inference (LNS_CUDA=1)
 #
 # Upstream trees: by default the three source trees (build/ggml, build/llama.cpp,
 # xlnscpp) are used at the pinned commits recorded in patches/*-base-commit.txt —
@@ -27,10 +30,11 @@
 # and scripts keep working. Select a variant at run time with
 # ./run.sh --sum-mode=<mode>.
 #
-# Backends: both LNS16 (xlns16) and LNS32 (xlns32) are built into every binary.
-# At runtime the GGML_LNS_BACKEND env var (16|32, default 16) selects which
-# backend claims ops. The LNS32 SmolLM2 inference run can be skipped with
-# LNS32_INFERENCE=0 (it is slow: float<->xlns32 conversion has no lookup table).
+# Backends: both LNS16 (xlns16) and LNS32 (xlns32) are built into every binary,
+# plus LNSCUDA16/LNSCUDA32 with --cuda. At runtime the GGML_LNS_BACKEND env var
+# (16|32|cuda16|cuda32, default 16) selects which backends claim ops. The LNS32
+# SmolLM2 inference run can be skipped with LNS32_INFERENCE=0 (it is slow:
+# float<->xlns32 conversion has no lookup table).
 #
 # Models (at least one required for inference):
 #   MODEL_SMOLLM  — SmolLM2-135M-Instruct-Q4_K_M.gguf (in repo root by default)
@@ -42,6 +46,7 @@ set -o pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 XLNSCPP_DIR="$REPO_ROOT/xlnscpp"
+XLNSCUDA_DIR="$REPO_ROOT/xlnscuda"
 BUILD_DIR="$REPO_ROOT/build"
 LLAMA_BASE_COMMIT="$(cat "$REPO_ROOT/patches/llama-base-commit.txt")"
 GGML_BASE_COMMIT="$(cat "$REPO_ROOT/patches/ggml-base-commit.txt")"
@@ -63,6 +68,7 @@ DO_CLEAN=0
 SUM_MODE_ARG=""
 LNS16_SUM="${LNS16_SUM:-}"
 LNS32_INFERENCE="${LNS32_INFERENCE:-1}"
+LNS_CUDA="${LNS_CUDA:-0}"
 
 for arg in "$@"; do
     case "$arg" in
@@ -70,6 +76,7 @@ for arg in "$@"; do
         --skip-inference)    RUN_INFERENCE=0 ;;
         --update)            DO_UPDATE=1 ;;
         --clean)             DO_CLEAN=1 ;;
+        --cuda)              LNS_CUDA=1 ;;
         --sum-mode=*)        SUM_MODE_ARG="${arg#*=}" ;;
         --sum-mode)          echo "ERROR: use --sum-mode=<base|monte|lpvip|sum32> (with '=')" >&2; exit 1 ;;
         *)                   echo "WARNING: ignoring unknown argument '$arg'" >&2 ;;
@@ -120,11 +127,14 @@ if [ "$RUN_INFERENCE" -eq 1 ] && [ -z "$MODEL_SMOLLM" ] && [ -z "$MODEL_LLAMA32"
     exit 1
 fi
 
-# Detect parallel job count
-if command -v nproc &>/dev/null; then
-    JOBS=$(nproc)
-else
-    JOBS=$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+# Parallel build jobs: $JOBS, or one per CPU. Lower it on machines with little
+# RAM (each compiler process can take ~1 GB on the larger llama.cpp files).
+if [ -z "${JOBS:-}" ]; then
+    if command -v nproc &>/dev/null; then
+        JOBS=$(nproc)
+    else
+        JOBS=$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+    fi
 fi
 
 # shellcheck source=scripts/integrate-lns.sh
@@ -137,29 +147,60 @@ check_deps() {
             exit 1
         fi
     done
+    if [ "$LNS_CUDA" -eq 1 ] && ! command -v nvcc &>/dev/null; then
+        echo "ERROR: --cuda needs the CUDA toolkit ('nvcc' not found on PATH)." >&2
+        exit 1
+    fi
+}
+
+# nvcc refuses host compilers newer than it supports (CUDA 12.0 stops at
+# GCC 12). Unless CUDAHOSTCXX is already set, use the first g++ it accepts.
+pick_cuda_host_compiler() {
+    if [ -z "${CUDAHOSTCXX:-}" ]; then
+        local probe_dir cxx
+        probe_dir="$(mktemp -d)"
+        echo '__global__ void k() {} int main() { k<<<1, 1>>>(); return 0; }' > "$probe_dir/probe.cu"
+        # Probe with absolute paths, as CMake passes them: given a bare
+        # "g++", some nvcc packages (e.g. Ubuntu's) substitute their own
+        # wrapper for a supported version, so a bare-name probe would pass
+        # for a compiler CMake then cannot use.
+        for cxx in g++ g++-14 g++-13 g++-12 g++-11 g++-10; do
+            cxx="$(command -v "$cxx")" || continue
+            if nvcc -ccbin "$cxx" -c "$probe_dir/probe.cu" -o "$probe_dir/probe.o" &>/dev/null; then
+                CUDAHOSTCXX="$cxx"
+                break
+            fi
+        done
+        rm -rf "$probe_dir"
+        if [ -z "${CUDAHOSTCXX:-}" ]; then
+            echo "ERROR: nvcc accepts none of the installed g++ versions; install one it supports" >&2
+            echo "       (e.g. g++-12 for CUDA 12.0) or set CUDAHOSTCXX=/path/to/g++" >&2
+            exit 1
+        fi
+    fi
+    export CUDAHOSTCXX
+    echo "    CUDA host compiler: $CUDAHOSTCXX"
+}
+
+# xlnscuda is used as checked out (the superproject's gitlink is its pin). The
+# GPU backend needs its device lookup tables, so check for them up front.
+prepare_xlnscuda() {
+    if [ ! -e "$XLNSCUDA_DIR/.git" ]; then
+        echo "    Initialising xlnscuda submodule..."
+        git -C "$REPO_ROOT" submodule update --init xlnscuda
+    fi
+    if ! grep -q 'xlns16d_table_init' "$XLNSCUDA_DIR/xlns16d.cu"; then
+        echo "ERROR: $XLNSCUDA_DIR predates device table support (xlns16d_table_init);" >&2
+        echo "       update the xlnscuda submodule." >&2
+        exit 1
+    fi
+    echo "    xlnscuda at $(git -C "$XLNSCUDA_DIR" rev-parse --short HEAD)"
 }
 
 # NOTE: functions below are invoked from contexts where `set -e` is suppressed
 # (the `if ! run_build_and_test` retry wrapper disables errexit inside the
 # whole call tree — a bash rule), so failures must be propagated explicitly
 # with `|| return 1`.
-copy_backend() {
-    local dest_src="$1"
-    local dest_inc="$2"
-    local dest_src32="${dest_src%/ggml-lns}/ggml-lns32"
-    mkdir -p "$dest_src" "$dest_src32" || return 1
-    cp "$REPO_ROOT/lns-backend/src/ggml-lns.cpp" "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/src/lns-ops.cpp"  "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/src/lns-ops.h"    "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/src/lns16-sum32.h" "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/src/CMakeLists.txt" "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/include/ggml-lns.h" "$dest_inc/" || return 1
-    cp "$REPO_ROOT/lns-backend/src32/ggml-lns32.cpp" "$dest_src32/" || return 1
-    cp "$REPO_ROOT/lns-backend/src32/lns32-ops.cpp"  "$dest_src32/" || return 1
-    cp "$REPO_ROOT/lns-backend/src32/lns32-ops.h"    "$dest_src32/" || return 1
-    cp "$REPO_ROOT/lns-backend/src32/CMakeLists.txt" "$dest_src32/" || return 1
-    cp "$REPO_ROOT/lns-backend/include/ggml-lns32.h" "$dest_inc/" || return 1
-}
 
 # Bring a source tree to the wanted commit. Default: the pinned commit, with no
 # network access and no reset when the tree is already there (preserves manual
@@ -209,20 +250,6 @@ fallback_xlnscpp() {
     echo "    at $(git rev-parse --short HEAD)"
 }
 
-prepare_ggml_test_files() {
-    local ggml_dir="$1"
-    cp "$REPO_ROOT/lns-backend/test-lns-backend.cpp" "$ggml_dir/examples/simple/" || return 1
-    if ! grep -q 'test-lns-backend' "$ggml_dir/examples/simple/CMakeLists.txt"; then
-        cat >> "$ggml_dir/examples/simple/CMakeLists.txt" << 'EOF'
-
-if (GGML_LNS)
-    add_executable(test-lns-backend test-lns-backend.cpp)
-    target_link_libraries(test-lns-backend PRIVATE ggml)
-endif()
-EOF
-    fi
-}
-
 prepare_ggml() {
     local ggml_dir="$1"
     if [ ! -d "$ggml_dir/.git" ]; then
@@ -232,7 +259,7 @@ prepare_ggml() {
     ensure_repo_at "$ggml_dir" master "$GGML_BASE_COMMIT" || return 1
     integrate_lns_or_fallback "$ggml_dir" \
         "$REPO_ROOT/patches/ggml-core.patch" "$GGML_BASE_COMMIT" || return 1
-    copy_backend "$ggml_dir/src/ggml-lns" "$ggml_dir/include" || return 1
+    copy_lns_backends "$ggml_dir" || return 1
 }
 
 prepare_llama() {
@@ -244,7 +271,7 @@ prepare_llama() {
     ensure_repo_at "$llama_dir" master "$LLAMA_BASE_COMMIT" || return 1
     integrate_lns_or_fallback "$llama_dir" \
         "$REPO_ROOT/patches/llama-core.patch" "$LLAMA_BASE_COMMIT" || return 1
-    copy_backend "$llama_dir/ggml/src/ggml-lns" "$llama_dir/ggml/include" || return 1
+    copy_lns_backends "$llama_dir/ggml" || return 1
 }
 
 # Configure and build one LNS variant build dir (src_dir/build-lns-<mode>).
@@ -254,15 +281,21 @@ build_lns_variant() {
     local mode="$2"
     shift 2
     local bdir="$src_dir/build-lns-$mode"
+    local cuda_args=(-DGGML_LNSCUDA=OFF)
+    if [ "$LNS_CUDA" -eq 1 ]; then
+        cuda_args=(-DGGML_LNSCUDA=ON -DXLNSCUDA_DIR="$XLNSCUDA_DIR" -DCMAKE_CUDA_HOST_COMPILER="$CUDAHOSTCXX")
+    fi
     mkdir -p "$bdir" || return 1
     cd "$bdir" || return 1
     cmake .. \
         -DGGML_LNS=ON \
         -DGGML_LNS32=ON \
+        "${cuda_args[@]}" \
         -DGGML_LNS16_SUM="$mode" \
         -DGGML_LNS16_MONTE_BYLPVIP=OFF \
         -DGGML_BLAS=OFF \
         -DGGML_METAL=OFF \
+        -DGGML_CUDA=OFF \
         -DGGML_CPU_REPACK=OFF \
         -DCMAKE_BUILD_TYPE=Release \
         -DXLNSCPP_DIR="$XLNSCPP_DIR" || return 1
@@ -279,8 +312,10 @@ build_cpu_ref() {
     cmake .. \
         -DGGML_LNS=OFF \
         -DGGML_LNS32=OFF \
+        -DGGML_LNSCUDA=OFF \
         -DGGML_BLAS=OFF \
         -DGGML_METAL=OFF \
+        -DGGML_CUDA=OFF \
         -DGGML_CPU_REPACK=OFF \
         -DCMAKE_BUILD_TYPE=Release || return 1
     cmake --build . --target llama-completion llama-perplexity -j"$JOBS" || return 1
@@ -304,12 +339,12 @@ run_inference() {
     local label="$1"
     local model_path="$2"
     local llama_bin="$3"
-    local backend="${4:-16}"   # GGML_LNS_BACKEND: 16 or 32
+    local backend="${4:-16}"   # GGML_LNS_BACKEND: 16, 32, cuda16 or cuda32
     local n_tokens="${5:-20}"
     local mode="${6:-${MODES[0]}}"
 
     echo ""
-    echo "==> Running LNS inference: $label (backend: LNS$backend, sum mode: $mode)"
+    echo "==> Running LNS inference: $label (GGML_LNS_BACKEND=$backend, sum mode: $mode)"
     GGML_LNS_BACKEND="$backend" "$llama_bin" \
         -m "$model_path" \
         -p "The capital of France is" \
@@ -330,11 +365,15 @@ run_build_and_test() {
         GGML_DIR="$BUILD_DIR/ggml"
         prepare_ggml "$GGML_DIR" || return 1
         GGML_PREPARED=1
-        prepare_ggml_test_files "$GGML_DIR" || return 1
+        copy_lns_tests "$GGML_DIR" || return 1
 
+        local test_targets=(test-lns-backend)
+        if [ "$LNS_CUDA" -eq 1 ]; then
+            test_targets+=(test-lns-cuda-parity)
+        fi
         for mode in "${MODES[@]}"; do
-            echo "    Building test-lns-backend (sum mode: $mode)"
-            build_lns_variant "$GGML_DIR" "$mode" test-lns-backend || return 1
+            echo "    Building ${test_targets[*]} (sum mode: $mode)"
+            build_lns_variant "$GGML_DIR" "$mode" "${test_targets[@]}" || return 1
         done
         link_build_compat "$GGML_DIR" || return 1
 
@@ -349,6 +388,29 @@ run_build_and_test() {
         echo "==> Running test-lns-backend (LNS32)"
         ( cd "$GGML_DIR/build-lns-${MODES[0]}" && \
             GGML_LNS_BACKEND=32 ./bin/test-lns-backend LNS32 ) || return 1
+
+        if [ "$LNS_CUDA" -eq 1 ]; then
+            # LNSCUDA16 reproduces the base summation, so it is graded (and
+            # compared bit for bit) in the base build only.
+            if [[ " ${MODES[*]} " == *" base "* ]]; then
+                echo ""
+                echo "==> Running test-lns-cuda-parity (LNSCUDA16 vs LNS16, LNSCUDA32 vs LNS32)"
+                local parity_status=0
+                ( cd "$GGML_DIR/build-lns-base" && ./bin/test-lns-cuda-parity ) || parity_status=$?
+                if [ "$parity_status" -eq 77 ]; then
+                    echo "NOTE: no CUDA device visible; GPU tests skipped (the build itself succeeded)" >&2
+                elif [ "$parity_status" -ne 0 ]; then
+                    return 1
+                else
+                    echo ""
+                    echo "==> Running test-lns-backend (LNSCUDA16, LNSCUDA32)"
+                    ( cd "$GGML_DIR/build-lns-base" && \
+                        ./bin/test-lns-backend LNSCUDA16 base && ./bin/test-lns-backend LNSCUDA32 ) || return 1
+                fi
+            else
+                echo "NOTE: CUDA tests run in the base build; include base in --sum-mode to run them" >&2
+            fi
+        fi
     fi
 
     # ── End-to-end inference (llama.cpp) ─────────────────────────────────────
@@ -387,6 +449,21 @@ run_build_and_test() {
             run_inference "SmolLM2-135M-Instruct" "$MODEL_SMOLLM" \
                 "$LLAMA_DIR/build-lns-${MODES[0]}/bin/llama-completion" 32 4 "${MODES[0]}" || return 1
         fi
+
+        if [ "$LNS_CUDA" -eq 1 ]; then
+            # The GPU backends do not depend on the sum mode; LNSCUDA16 matches
+            # the base build's CPU results token for token.
+            local cuda_bin="$LLAMA_DIR/build-lns-${MODES[0]}/bin/llama-completion"
+            local cuda_backend
+            for cuda_backend in cuda16 cuda32; do
+                if [ -n "$MODEL_SMOLLM" ]; then
+                    run_inference "SmolLM2-135M-Instruct" "$MODEL_SMOLLM" "$cuda_bin" "$cuda_backend" 20 "${MODES[0]}" || return 1
+                fi
+                if [ -n "$MODEL_LLAMA32" ] && [ "$cuda_backend" = cuda16 ]; then
+                    run_inference "Llama-3.2-1B-Instruct" "$MODEL_LLAMA32" "$cuda_bin" "$cuda_backend" 20 "${MODES[0]}" || return 1
+                fi
+            done
+        fi
     fi
 }
 
@@ -421,6 +498,12 @@ check_deps
 
 echo "==> Preparing xlnscpp"
 prepare_xlnscpp
+
+if [ "$LNS_CUDA" -eq 1 ]; then
+    echo "==> Preparing xlnscuda"
+    prepare_xlnscuda
+    pick_cuda_host_compiler
+fi
 
 mkdir -p "$BUILD_DIR"
 

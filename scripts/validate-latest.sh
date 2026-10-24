@@ -45,23 +45,6 @@ log() { echo "$@" | tee -a "$LOG_FILE"; }
 # suppressed (the `if ! run_validation` retry wrapper disables errexit inside
 # the whole call tree — a bash rule), so failures must be propagated
 # explicitly with `|| return 1`.
-copy_backend() {
-    local dest_src="$1"
-    local dest_inc="$2"
-    local dest_src32="${dest_src%/ggml-lns}/ggml-lns32"
-    mkdir -p "$dest_src" "$dest_src32" || return 1
-    cp "$REPO_ROOT/lns-backend/src/ggml-lns.cpp" "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/src/lns-ops.cpp"  "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/src/lns-ops.h"    "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/src/lns16-sum32.h" "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/src/CMakeLists.txt" "$dest_src/" || return 1
-    cp "$REPO_ROOT/lns-backend/include/ggml-lns.h" "$dest_inc/" || return 1
-    cp "$REPO_ROOT/lns-backend/src32/ggml-lns32.cpp" "$dest_src32/" || return 1
-    cp "$REPO_ROOT/lns-backend/src32/lns32-ops.cpp"  "$dest_src32/" || return 1
-    cp "$REPO_ROOT/lns-backend/src32/lns32-ops.h"    "$dest_src32/" || return 1
-    cp "$REPO_ROOT/lns-backend/src32/CMakeLists.txt" "$dest_src32/" || return 1
-    cp "$REPO_ROOT/lns-backend/include/ggml-lns32.h" "$dest_inc/" || return 1
-}
 
 # shellcheck source=integrate-lns.sh
 source "$REPO_ROOT/scripts/integrate-lns.sh"
@@ -101,19 +84,9 @@ git reset --hard origin/master || return 1
 GGML_SHA=$(git rev-parse HEAD)
 log "    ggml at $GGML_SHA"
 
-integrate_lns_regex "$GGML_DIR" || return 1
-copy_backend "$GGML_DIR/src/ggml-lns" "$GGML_DIR/include" || return 1
-
-cp "$REPO_ROOT/lns-backend/test-lns-backend.cpp" "$GGML_DIR/examples/simple/" || return 1
-if ! grep -q 'test-lns-backend' "$GGML_DIR/examples/simple/CMakeLists.txt"; then
-    cat >> "$GGML_DIR/examples/simple/CMakeLists.txt" << 'EOF'
-
-if (GGML_LNS)
-    add_executable(test-lns-backend test-lns-backend.cpp)
-    target_link_libraries(test-lns-backend PRIVATE ggml)
-endif()
-EOF
-fi
+integrate_lns "$GGML_DIR" || return 1
+copy_lns_backends "$GGML_DIR" || return 1
+copy_lns_tests "$GGML_DIR" || return 1
 
 mkdir -p "$GGML_DIR/build-lns" || return 1
 cd "$GGML_DIR/build-lns" || return 1
@@ -130,6 +103,7 @@ for mode in base monte sum32 lpvip; do
         -DGGML_BLAS=OFF \
         -DGGML_CPU_REPACK=OFF \
         -DGGML_METAL=OFF \
+        -DGGML_CUDA=OFF \
         -DCMAKE_BUILD_TYPE=Release \
         -DXLNSCPP_DIR="$XLNSCPP_DIR" || return 1
     cmake --build . --target test-lns-backend -j"$JOBS" || return 1
@@ -157,8 +131,8 @@ git reset --hard origin/master || return 1
 LLAMA_SHA=$(git rev-parse HEAD)
 log "    llama.cpp at $LLAMA_SHA"
 
-integrate_lns_regex "$LLAMA_DIR/ggml" || return 1
-copy_backend "$LLAMA_DIR/ggml/src/ggml-lns" "$LLAMA_DIR/ggml/include" || return 1
+integrate_lns "$LLAMA_DIR/ggml" || return 1
+copy_lns_backends "$LLAMA_DIR/ggml" || return 1
 
 mkdir -p "$LLAMA_DIR/build-lns" || return 1
 cd "$LLAMA_DIR/build-lns" || return 1
@@ -175,6 +149,7 @@ for mode in base monte sum32 lpvip; do
         -DGGML_LNS16_MONTE_BYLPVIP=OFF \
         -DGGML_BLAS=OFF \
         -DGGML_METAL=OFF \
+        -DGGML_CUDA=OFF \
         -DGGML_CPU_REPACK=OFF \
         -DCMAKE_BUILD_TYPE=Release \
         -DXLNSCPP_DIR="$XLNSCPP_DIR" || return 1

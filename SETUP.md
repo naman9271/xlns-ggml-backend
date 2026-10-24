@@ -8,10 +8,13 @@
 - the `hf` CLI for model downloads (`pip install -U huggingface_hub`)
 - Disk: ~2.5 GB for the source clones and the default four-variant build,
   plus the models you download (0.1–10 GB each)
-- Platform: developed and measured on macOS / Apple Silicon (M3, 16 GB).
+- Platform: the CPU backends were developed and measured on macOS / Apple
+  Silicon (M3, 16 GB); the GPU backends on Ubuntu 24.04 with an RTX 2050.
   All builds deliberately pass `-DGGML_BLAS=OFF -DGGML_METAL=OFF` so the LNS
   backends actually execute the math (see the CPU-reference warning below).
-  Linux is untested.
+- Optional, for the GPU backends (`--cuda`): an NVIDIA GPU and driver, the CUDA
+  toolkit (`nvcc`), and a host compiler `nvcc` accepts (`setup.sh` finds one,
+  e.g. `g++-12` for CUDA 12.0). See [docs/CUDA.md](docs/CUDA.md).
 
 ## Steps
 
@@ -20,7 +23,7 @@
 ```bash
 git clone https://github.com/xlnsresearch/xlns-ggml-backend
 cd xlns-ggml-backend
-git submodule update --init   # optional — setup.sh also initialises xlnscpp
+git submodule update --init   # optional — setup.sh also initialises xlnscpp (and xlnscuda with --cuda)
 ```
 
 `setup.sh` uses `xlnscpp/` at the pinned commit in `patches/xlnscpp-base-commit.txt` (which matches the recorded submodule state). Only `./setup.sh --update` advances it to latest `origin/main`.
@@ -75,6 +78,11 @@ works; it was removed in v1.0.
 # Force-reset the source trees to the pinned commits (discards in-tree edits)
 ./setup.sh --clean
 
+# Also build the GPU backends (LNSCUDA16/LNSCUDA32), test them against the CPU
+# backends, and run GPU inference; combine with any of the above. Limit the
+# build's parallelism on machines with little RAM with JOBS=N.
+./setup.sh --cuda --sum-mode=base --unit-test
+
 # Explicit model paths (MODEL_LLAMA32 enables the Llama 3.2 1B inference run)
 MODEL_SMOLLM=/path/to/SmolLM2-135M-Instruct-Q4_K_M.gguf \
 MODEL_LLAMA32=/path/to/Llama-3.2-1B-Instruct-Q4_K_M.gguf \
@@ -95,10 +103,11 @@ is no `build-ref` there).
 
 `MODEL=/path/to/model.gguf` remains supported as an alias for `MODEL_SMOLLM`.
 
-At runtime, `GGML_LNS_BACKEND=16|32` (default `16`) selects which of the two
-backends claims ops — both are always built. `LNS_OP_AUDIT=1` prints one JSON
-line per `supports_op` query (including which backend answered and, for LNS16,
-the compiled sum mode).
+At runtime, `GGML_LNS_BACKEND=16|32|cuda16|cuda32` (default `16`) selects which
+backends claim ops — LNS16 and LNS32 are always built, the GPU backends with
+`--cuda`. `LNS_OP_AUDIT=1` prints one JSON line per `supports_op` query
+(including which backend answered and, for LNS16, the compiled sum mode);
+`scripts/lns-op-coverage.py` summarises such a log.
 
 ## What success looks like
 
@@ -125,6 +134,11 @@ Approximate wall-clock on an M3 MacBook (the backends are single-threaded):
 | DeepSeek-1.5B, LNS16 | ~17–25 s/token |
 | `llama-perplexity`, 1.5B model, one 256-token chunk | ~20 min |
 
+With `--cuda`, on an RTX 2050 laptop GPU (LNSCUDA16 gives the same tokens as
+LNS16 `base`): SmolLM2-135M ~12 tokens/s, Qwen2.5-0.5B ~10 tokens/s,
+Llama-3.2-1B ~7 tokens/s; LNSCUDA32 about half that. See
+[docs/LOCAL_LLM.md](docs/LOCAL_LLM.md).
+
 A first `./setup.sh` run is build-dominated (two clones + five llama.cpp build
 trees) — expect tens of minutes. Later runs skip whatever is already built.
 
@@ -137,6 +151,7 @@ After a successful `./setup.sh`, re-run the model without rebuilding:
 ./run.sh --sum-mode=sum32         # pick a summation-variant binary
 ./run.sh --sum-mode=all -n 8      # same prompt across all four variants, in sequence
 ./run.sh --backend=32             # LNS32; default -n 4
+./run.sh --backend=cuda16         # LNS16 arithmetic on the GPU (needs ./setup.sh --cuda)
 ./run.sh -m ./other_model_file.gguf -n 40
 ./run.sh -p "Hello" -- --temp 0.2 # extra args after -- go to llama-completion
 ```
@@ -152,17 +167,18 @@ Each summation mode is a separate compile-time binary produced by `setup.sh`;
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `--sum-mode=MODE` | `base` (or `$LNS16_SUM`) | `base`\|`monte`\|`lpvip`\|`sum32`\|`all` — which variant binary; `all` runs every variant in turn |
-| `--backend=16\|32` | `16` (or `$GGML_LNS_BACKEND`) | Which LNS backend claims ops |
+| `--backend=B` | `16` (or `$GGML_LNS_BACKEND`) | Which LNS backend claims ops: `16`, `32`, `cuda16` (alias `cuda`), `cuda32` |
 | `-m`, `--model PATH` | `$MODEL` / `$MODEL_SMOLLM` / repo-root SmolLM2 GGUF | Model file |
 | `-p`, `--prompt TEXT` | `The capital of France is` | Prompt |
-| `-n`, `--tokens N` | `20` (LNS16) or `4` (LNS32) | Tokens to predict |
+| `-n`, `--tokens N` | `4` for CPU LNS32, else `20` | Tokens to predict |
 | `-h`, `--help` | — | Show usage |
 | `-- …` | — | Forward remaining args to `llama-completion` |
 
 Space-separated forms (`--sum-mode MODE`, `--backend N`) are accepted too.
 Always passed to `llama-completion`: `-fa off -no-cnv`.
 
-Useful env vars: `GGML_LNS_BACKEND`, `MODEL` / `MODEL_SMOLLM`, `LNS_OP_AUDIT=1`.
+Useful env vars: `GGML_LNS_BACKEND`, `MODEL` / `MODEL_SMOLLM`, `LNS_OP_AUDIT=1`,
+and for the GPU backends `GGML_LNS_CUDA_DEVICE` and `GGML_LNS_CUDA_CACHE_MB`.
 
 ### Important `llama-completion` flags
 
@@ -282,7 +298,7 @@ Everything in `results/sum32-evidence/` can be re-measured:
 - `standalone-sum32-invariants.txt` — the no-ggml standalone check:
 
   ```bash
-  g++ -O2 -std=c++17 -I xlnscpp -I lns-backend/src lns-backend/test-lns16-sum32.cpp -o /tmp/test-lns16-sum32 && /tmp/test-lns16-sum32
+  g++ -O2 -std=c++17 -I xlnscpp -I lns-backend/src lns-backend/tests/test-lns16-sum32.cpp -o /tmp/test-lns16-sum32 && /tmp/test-lns16-sum32
   ```
 
 - `robust-sum32.txt` — for each of the three prompts and two models in the
@@ -332,6 +348,13 @@ fetches once if a pinned commit is absent from the local object store:
 | [xlnscpp](https://github.com/xlnsresearch/xlnscpp) | `patches/xlnscpp-base-commit.txt` | `origin/main` | submodule init + checkout |
 | [ggml](https://github.com/ggml-org/ggml) | `patches/ggml-base-commit.txt` | `origin/master` | regex edits in [`scripts/integrate-lns.sh`](scripts/integrate-lns.sh) |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | `patches/llama-base-commit.txt` | `origin/master` | regex edits in [`scripts/integrate-lns.sh`](scripts/integrate-lns.sh) |
+| [xlnscuda](https://github.com/xlnsresearch/xlnscuda) (`--cuda` only) | the submodule's recorded commit | not updated | used as checked out; must provide `xlns16d_table_init` |
+
+The edits are driven by the backend manifest `scripts/lns-backends.sh` and
+written as generated blocks between `>>> xlns-ggml-backend:` markers, so
+re-running integration is idempotent; trees hooked by an older version of the
+script are restored from git and re-integrated automatically. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#build-integration).
 
 If the regex integration fails (in any mode), setup resets that tree to its
 pinned commit and applies `patches/ggml-core.patch` /

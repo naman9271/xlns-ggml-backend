@@ -1161,8 +1161,11 @@ void lns_rope(struct ggml_tensor * dst) {
 
     const bool is_neox = (mode & 2) != 0; // NEOX-style: pairs at distance n_dims/2
 
+    // YaRN, linear scaling and attention scaling are declined by
+    // lns::check_rope; only the optional frequency factors (src[2]) apply.
     (void)n_ctx_orig; (void)ext_factor; (void)attn_factor;
     (void)beta_fast; (void)beta_slow; (void)freq_scale;
+    const float * freq_factors = dst->src[2] ? (const float *) dst->src[2]->data : nullptr;
 
     const float theta_scale = powf(freq_base, -2.0f / n_dims);
 
@@ -1177,8 +1180,9 @@ void lns_rope(struct ggml_tensor * dst) {
 
                 float t = (float)pos;
                 for (int64_t j = 0; j < n_dims; j += 2) {
-                    float cos_t = cosf(t);
-                    float sin_t = sinf(t);
+                    const float theta = freq_factors ? t / freq_factors[j / 2] : t;
+                    float cos_t = cosf(theta);
+                    float sin_t = sinf(theta);
 
                     // Convert cos/sin to xlns16 for the rotation
                     xlns16 c     = fp2xlns16(cos_t);

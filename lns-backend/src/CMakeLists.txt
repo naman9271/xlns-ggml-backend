@@ -3,6 +3,9 @@ ggml_add_backend_library(ggml-lns
     lns-ops.cpp
 )
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../ggml-lns-common/lns-common.cmake)
+lns_backend_common_setup(ggml-lns)
+
 # xlnscpp uses a header-inclusion model: #include "xlns16.cpp" with defines.
 # xlns16_table enables the 65536-entry O(1) float<->xlns16 lookup table.
 # xlns16_alt enables the reduced-branching sb/db addition path.
@@ -42,11 +45,3 @@ if(GGML_LNS16_MONTE_BYLPVIP)
     endif()
     target_compile_definitions(ggml-lns PRIVATE GGML_LNS16_MONTE_BYLPVIP)
 endif()
-
-# Point to the xlnscpp submodule so #include "xlns16.cpp" resolves.
-# When building inside ggml/llama.cpp, xlnscpp must be available at the path
-# below, or you can override with -DXLNSCPP_DIR=/path/to/xlnscpp.
-if(NOT DEFINED XLNSCPP_DIR)
-    set(XLNSCPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../xlnscpp")
-endif()
-target_include_directories(ggml-lns PRIVATE ${XLNSCPP_DIR})

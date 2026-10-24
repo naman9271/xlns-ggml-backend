@@ -28,6 +28,8 @@
 #   ./scripts/lns-vs-cpu-quality.sh                      # default: SmolLM2, quick
 #   ./scripts/lns-vs-cpu-quality.sh -m model.gguf [-m model2.gguf ...]
 #   ./scripts/lns-vs-cpu-quality.sh -b 32                # LNS32 instead of LNS16
+#   ./scripts/lns-vs-cpu-quality.sh -b cuda16            # LNS16 arithmetic on the GPU
+#                                                        # (needs ./setup.sh --cuda)
 #   ./scripts/lns-vs-cpu-quality.sh --skip-ppl           # divergence only
 #   ./scripts/lns-vs-cpu-quality.sh -n 40 --ppl-chunks 2 # more tokens / chunks
 #
@@ -79,7 +81,10 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-case "$BACKEND" in 16|32) ;; *) echo "ERROR: backend must be 16 or 32" >&2; exit 1 ;; esac
+case "$BACKEND" in
+    16|32|cuda|cuda16|cuda32) ;;
+    *) echo "ERROR: backend must be 16, 32, cuda16 or cuda32" >&2; exit 1 ;;
+esac
 
 if [ "${#MODELS[@]}" -eq 0 ]; then
     MODELS=("$REPO_ROOT/SmolLM2-135M-Instruct-Q4_K_M.gguf")
@@ -145,7 +150,7 @@ overall_rc=0
 
 for model in "${MODELS[@]}"; do
     name="$(basename "$model")"
-    echo "==> $name (LNS$BACKEND vs CPU reference)"
+    echo "==> $name (GGML_LNS_BACKEND=$BACKEND vs CPU reference)"
 
     # --- 1. greedy first-divergence (informational) --------------------------
     "$REF_COMPLETION" -m "$model" -p "$PROMPT" -n "$N_TOKENS" -fa off -no-cnv \
