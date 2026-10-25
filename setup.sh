@@ -51,6 +51,7 @@ BUILD_DIR="$REPO_ROOT/build"
 LLAMA_BASE_COMMIT="$(cat "$REPO_ROOT/patches/llama-base-commit.txt")"
 GGML_BASE_COMMIT="$(cat "$REPO_ROOT/patches/ggml-base-commit.txt")"
 XLNSCPP_BASE_COMMIT="$(cat "$REPO_ROOT/patches/xlnscpp-base-commit.txt")"
+XLNSCUDA_BASE_COMMIT="$(cat "$REPO_ROOT/patches/xlnscuda-base-commit.txt")"
 
 MODEL_SMOLLM="${MODEL_SMOLLM:-${MODEL:-}}"
 # The repo-root SmolLM2 GGUF is only a default when it actually exists (models
@@ -182,19 +183,20 @@ pick_cuda_host_compiler() {
     echo "    CUDA host compiler: $CUDAHOSTCXX"
 }
 
-# xlnscuda is used as checked out (the superproject's gitlink is its pin). The
-# GPU backend needs its device lookup tables, so check for them up front.
+# Same pin-first policy as xlnscpp (patches/xlnscuda-base-commit.txt; --update
+# moves to origin/main). The GPU backend needs xlnscuda's device lookup tables,
+# so check for them up front.
 prepare_xlnscuda() {
     if [ ! -e "$XLNSCUDA_DIR/.git" ]; then
         echo "    Initialising xlnscuda submodule..."
         git -C "$REPO_ROOT" submodule update --init xlnscuda
     fi
+    ensure_repo_at "$XLNSCUDA_DIR" main "$XLNSCUDA_BASE_COMMIT" || exit 1
     if ! grep -q 'xlns16d_table_init' "$XLNSCUDA_DIR/xlns16d.cu"; then
         echo "ERROR: $XLNSCUDA_DIR predates device table support (xlns16d_table_init);" >&2
         echo "       update the xlnscuda submodule." >&2
         exit 1
     fi
-    echo "    xlnscuda at $(git -C "$XLNSCUDA_DIR" rev-parse --short HEAD)"
 }
 
 # NOTE: functions below are invoked from contexts where `set -e` is suppressed
@@ -248,6 +250,11 @@ fallback_xlnscpp() {
     cd "$XLNSCPP_DIR"
     git reset --hard "$XLNSCPP_BASE_COMMIT"
     echo "    at $(git rev-parse --short HEAD)"
+    if [ "$LNS_CUDA" -eq 1 ]; then
+        cd "$XLNSCUDA_DIR"
+        git reset --hard "$XLNSCUDA_BASE_COMMIT"
+        echo "    xlnscuda at $(git rev-parse --short HEAD)"
+    fi
 }
 
 prepare_ggml() {
@@ -476,6 +483,10 @@ update_pins() {
     echo "==> Recording updated trees as pinned commits (last known good)"
     git -C "$XLNSCPP_DIR" rev-parse HEAD > "$REPO_ROOT/patches/xlnscpp-base-commit.txt"
     echo "    xlnscpp  $(git -C "$XLNSCPP_DIR" rev-parse --short HEAD)"
+    if [ "$LNS_CUDA" -eq 1 ]; then
+        git -C "$XLNSCUDA_DIR" rev-parse HEAD > "$REPO_ROOT/patches/xlnscuda-base-commit.txt"
+        echo "    xlnscuda $(git -C "$XLNSCUDA_DIR" rev-parse --short HEAD)"
+    fi
     if [ "$LLAMA_PREPARED" -eq 1 ]; then
         git -C "$BUILD_DIR/llama.cpp" rev-parse HEAD > "$REPO_ROOT/patches/llama-base-commit.txt"
         git -C "$BUILD_DIR/llama.cpp" diff -- ggml/ > "$REPO_ROOT/patches/llama-core.patch"
@@ -512,7 +523,7 @@ GGML_PREPARED=0
 
 if ! run_build_and_test; then
     if [ "$DO_UPDATE" -eq 1 ]; then
-        # Latest xlnscpp may be the culprit; retry against its pinned commit.
+        # Latest xlnscpp / xlnscuda may be the culprit; retry against their pinned commits.
         fallback_xlnscpp
         run_build_and_test
     else

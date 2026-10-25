@@ -12,7 +12,6 @@ numerical experiment:
   last ulp (see [Numerics](#numerics)).
 
 For how this fits next to the CPU backends, see [ARCHITECTURE.md](ARCHITECTURE.md).
-For picking and testing models on a small GPU, see [LOCAL_LLM.md](LOCAL_LLM.md).
 
 ## Requirements
 

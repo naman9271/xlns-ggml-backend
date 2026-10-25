@@ -23,7 +23,7 @@ runs an LLM's compute in LNS arithmetic:
   [docs/CUDA.md](docs/CUDA.md).
 
 How the backends share one framework, and how to add another library, is in
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Running and testing local models
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 

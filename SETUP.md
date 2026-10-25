@@ -26,7 +26,7 @@ cd xlns-ggml-backend
 git submodule update --init   # optional — setup.sh also initialises xlnscpp (and xlnscuda with --cuda)
 ```
 
-`setup.sh` uses `xlnscpp/` at the pinned commit in `patches/xlnscpp-base-commit.txt` (which matches the recorded submodule state). Only `./setup.sh --update` advances it to latest `origin/main`.
+`setup.sh` uses `xlnscpp/` (and, with `--cuda`, `xlnscuda/`) at the pinned commits in `patches/xlnscpp-base-commit.txt` and `patches/xlnscuda-base-commit.txt` (which match the recorded submodule state). Only `./setup.sh --update` advances them to latest `origin/main`.
 
 ### 2. Models: what to download
 
@@ -137,7 +137,7 @@ Approximate wall-clock on an M3 MacBook (the backends are single-threaded):
 With `--cuda`, on an RTX 2050 laptop GPU (LNSCUDA16 gives the same tokens as
 LNS16 `base`): SmolLM2-135M ~12 tokens/s, Qwen2.5-0.5B ~10 tokens/s,
 Llama-3.2-1B ~7 tokens/s; LNSCUDA32 about half that. See
-[docs/LOCAL_LLM.md](docs/LOCAL_LLM.md).
+[docs/CUDA.md](docs/CUDA.md#performance).
 
 A first `./setup.sh` run is build-dominated (two clones + five llama.cpp build
 trees) — expect tens of minutes. Later runs skip whatever is already built.
@@ -348,7 +348,7 @@ fetches once if a pinned commit is absent from the local object store:
 | [xlnscpp](https://github.com/xlnsresearch/xlnscpp) | `patches/xlnscpp-base-commit.txt` | `origin/main` | submodule init + checkout |
 | [ggml](https://github.com/ggml-org/ggml) | `patches/ggml-base-commit.txt` | `origin/master` | regex edits in [`scripts/integrate-lns.sh`](scripts/integrate-lns.sh) |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | `patches/llama-base-commit.txt` | `origin/master` | regex edits in [`scripts/integrate-lns.sh`](scripts/integrate-lns.sh) |
-| [xlnscuda](https://github.com/xlnsresearch/xlnscuda) (`--cuda` only) | the submodule's recorded commit | not updated | used as checked out; must provide `xlns16d_table_init` |
+| [xlnscuda](https://github.com/xlnsresearch/xlnscuda) (`--cuda` only) | `patches/xlnscuda-base-commit.txt` | `origin/main` | submodule init + checkout; must provide `xlns16d_table_init` |
 
 The edits are driven by the backend manifest `scripts/lns-backends.sh` and
 written as generated blocks between `>>> xlns-ggml-backend:` markers, so
