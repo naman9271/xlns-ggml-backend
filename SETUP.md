@@ -12,6 +12,13 @@
   Silicon (M3, 16 GB); the GPU backends on Ubuntu 24.04 with an RTX 2050.
   All builds deliberately pass `-DGGML_BLAS=OFF -DGGML_METAL=OFF` so the LNS
   backends actually execute the math (see the CPU-reference warning below).
+- On 64-bit ARM Linux the compilers must have the NEON intrinsics llama.cpp
+  uses (`vld1q_s8_x4` and friends); `setup.sh` checks this first. Ubuntu
+  18.04's default GCC 7.5 (e.g. NVIDIA Jetson with JetPack 4) does not: install
+  a newer one (`sudo add-apt-repository ppa:ubuntu-toolchain-r/test && sudo apt
+  install gcc-11 g++-11`) and run `CC=gcc-11 CXX=g++-11 ./setup.sh`. Build
+  directories configured with a different compiler are wiped and rebuilt
+  automatically.
 - Optional, for the GPU backends (`--cuda`): an NVIDIA GPU and driver, the CUDA
   toolkit (`nvcc`), and a host compiler `nvcc` accepts (`setup.sh` finds one,
   e.g. `g++-12` for CUDA 12.0). See [docs/CUDA.md](docs/CUDA.md).

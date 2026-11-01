@@ -152,6 +152,49 @@ check_deps() {
         echo "ERROR: --cuda needs the CUDA toolkit ('nvcc' not found on PATH)." >&2
         exit 1
     fi
+    check_neon_intrinsics
+}
+
+# llama.cpp's aarch64 NEON code calls vld1q_*_x2/_x4 intrinsics that older
+# GCCs lack (7.5, Ubuntu 18.04's default, has none; 8.1 and 9.1 lack the _x4
+# forms, later point releases have them), so probe the compilers CMake will
+# pick rather than fail deep in the build with "implicit declaration" errors.
+check_neon_intrinsics() {
+    case "$(uname -m)" in
+        aarch64|arm64) ;;
+        *) return 0 ;;
+    esac
+    local probe_dir var lang cc
+    probe_dir="$(mktemp -d)"
+    cat > "$probe_dir/probe.c" <<'EOF'
+#include <arm_neon.h>
+int probe(const int8_t * b, const int16_t * s) {
+    int8x16x4_t x = vld1q_s8_x4(b);
+    int16x8x2_t y = vld1q_s16_x2(s);
+    return vgetq_lane_s8(x.val[0], 0) + vgetq_lane_s16(y.val[0], 0);
+}
+EOF
+    for var in CC CXX; do
+        if [ "$var" = CC ]; then
+            cc="${CC:-cc}"; lang=c
+        else
+            cc="${CXX:-c++}"; lang=c++
+        fi
+        # Unquoted: CC/CXX may carry a launcher or flags (e.g. "ccache gcc").
+        # shellcheck disable=SC2086
+        if ! $cc -x "$lang" -Werror=implicit-function-declaration \
+                -c "$probe_dir/probe.c" -o "$probe_dir/probe.o" &>/dev/null; then
+            rm -rf "$probe_dir"
+            echo "ERROR: the $var compiler '$cc' cannot compile the ARM NEON intrinsics llama.cpp" >&2
+            echo "       needs (vld1q_s8_x4, vld1q_s16_x2); GCC 7 (Ubuntu 18.04's default) lacks them." >&2
+            echo "       Install a newer GCC and select it with CC/CXX, e.g. on Ubuntu 18.04:" >&2
+            echo "         sudo add-apt-repository ppa:ubuntu-toolchain-r/test" >&2
+            echo "         sudo apt update && sudo apt install gcc-11 g++-11" >&2
+            echo "         CC=gcc-11 CXX=g++-11 ./setup.sh" >&2
+            exit 1
+        fi
+    done
+    rm -rf "$probe_dir"
 }
 
 # nvcc refuses host compilers newer than it supports (CUDA 12.0 stops at
@@ -281,6 +324,46 @@ prepare_llama() {
     copy_lns_backends "$llama_dir/ggml" || return 1
 }
 
+# Absolute, symlink-resolved path of a compiler command (its first word, so
+# "ccache gcc" resolves ccache), for comparing against CMake's cached path.
+resolve_compiler() {
+    local path
+    path="$(command -v "${1%% *}")" || return 1
+    readlink -f "$path" 2>/dev/null || echo "$path"
+}
+
+# Wipe a build dir that CMake would keep configuring wrongly:
+#  - CC/CXX name a different compiler than the cached one: CMake reads them
+#    only on a first configure and otherwise silently keeps the old compiler.
+#  - an earlier configure stopped mid compiler detection (e.g. CXX was not
+#    found), leaving a compiler record with no compile features. CMake reuses
+#    it without re-testing, and every later configure then fails with
+#    "target_compile_features no known features for C compiler".
+reset_stale_build_dir() {
+    local bdir="$1"
+    local cache="$bdir/CMakeCache.txt"
+    local reason="" lang var cached wanted
+    for lang in C CXX; do
+        if grep -qs "set(CMAKE_${lang}_COMPILE_FEATURES \"\")" \
+                "$bdir"/CMakeFiles/*/CMake${lang}Compiler.cmake; then
+            reason="an earlier configure stopped before finishing $lang compiler detection"
+        fi
+        var=CC
+        [ "$lang" = CXX ] && var=CXX
+        if [ -n "${!var:-}" ] && [ -f "$cache" ]; then
+            cached="$(sed -n "s/^CMAKE_${lang}_COMPILER:[A-Z]*=//p" "$cache")"
+            wanted="$(resolve_compiler "${!var}")" || continue
+            if [ -n "$cached" ] && [ "$(resolve_compiler "$cached")" != "$wanted" ]; then
+                reason="$var=${!var} differs from the cached $cached"
+            fi
+        fi
+    done
+    if [ -n "$reason" ]; then
+        echo "    Removing stale $(basename "$bdir") ($reason)"
+        rm -rf "$bdir" || return 1
+    fi
+}
+
 # Configure and build one LNS variant build dir (src_dir/build-lns-<mode>).
 # Remaining args are the cmake targets.
 build_lns_variant() {
@@ -292,6 +375,7 @@ build_lns_variant() {
     if [ "$LNS_CUDA" -eq 1 ]; then
         cuda_args=(-DGGML_LNSCUDA=ON -DXLNSCUDA_DIR="$XLNSCUDA_DIR" -DCMAKE_CUDA_HOST_COMPILER="$CUDAHOSTCXX")
     fi
+    reset_stale_build_dir "$bdir" || return 1
     mkdir -p "$bdir" || return 1
     cd "$bdir" || return 1
     cmake .. \
@@ -314,6 +398,7 @@ build_lns_variant() {
 build_cpu_ref() {
     local src_dir="$1"
     local bdir="$src_dir/build-ref"
+    reset_stale_build_dir "$bdir" || return 1
     mkdir -p "$bdir" || return 1
     cd "$bdir" || return 1
     cmake .. \
