@@ -8,15 +8,22 @@ base-2 logarithm of its magnitude, so multiplication and division become integer
 addition and subtraction while addition needs an approximation — see
 [xlnscpp](https://github.com/xlnsresearch/xlnscpp) for the full background.
 
-This repo implements two ggml backends on top of the xlnscpp library and hooks
-them into llama.cpp, so a stock `llama-completion` runs an LLM's compute in LNS
-arithmetic:
+This repo implements ggml backends on top of the xlnscpp (CPU) and xlnscuda
+(GPU) libraries and hooks them into llama.cpp, so a stock `llama-completion`
+runs an LLM's compute in LNS arithmetic:
 
-- **LNS16** — 16-bit LNS (xlns16) arithmetic, with a compile-time choice of
-  summation algorithm (`base` / `monte` / `lpvip` / `sum32`) for the
+- **LNS16** — 16-bit LNS (xlns16) arithmetic on the CPU, with a compile-time
+  choice of summation algorithm (`base` / `monte` / `lpvip` / `sum32`) for the
   reduction-heavy ops (softmax, rms_norm, and the vec_dot inside mat-mul).
-- **LNS32** — 32-bit LNS (xlns32) arithmetic, structural parity port of the
-  same op set.
+- **LNS32** — 32-bit LNS (xlns32) arithmetic on the CPU, structural parity port
+  of the same op set.
+- **LNSCUDA16 / LNSCUDA32** — the same arithmetic on an NVIDIA GPU through
+  xlnscuda. LNSCUDA16 is bit-identical to LNS16 (`base`), so a GPU run
+  reproduces the CPU results token for token, much faster. See
+  [docs/CUDA.md](docs/CUDA.md).
+
+How the backends share one framework, and how to add another library, is in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
@@ -25,7 +32,7 @@ arithmetic:
 ```bash
 git clone https://github.com/xlnsresearch/xlns-ggml-backend
 cd xlns-ggml-backend
-git submodule update --init
+git submodule update --init   # optional — setup.sh also initialises the submodules
 
 # Model files are not shipped; download SmolLM2 (105 MB):
 pip install -U huggingface_hub
@@ -33,6 +40,10 @@ hf download bartowski/SmolLM2-135M-Instruct-GGUF SmolLM2-135M-Instruct-Q4_K_M.gg
 
 ./setup.sh                  # clone+build ggml/llama.cpp at pinned commits, run inference per sum mode
 ./run.sh --sum-mode=sum32   # re-run a variant without rebuilding
+
+# With an NVIDIA GPU and the CUDA toolkit:
+./setup.sh --cuda --sum-mode=base --unit-test
+./run.sh --backend=cuda16
 ```
 
 Expected output (SmolLM2, LNS16, `sum32`):
@@ -116,7 +127,7 @@ stagnation, long mixed-sign dots) are checked by a standalone program that
 needs no ggml:
 
 ```bash
-g++ -O2 -std=c++17 -I xlnscpp -I lns-backend/src lns-backend/test-lns16-sum32.cpp -o /tmp/test-lns16-sum32 && /tmp/test-lns16-sum32
+g++ -O2 -std=c++17 -I xlnscpp -I lns-backend/src lns-backend/tests/test-lns16-sum32.cpp -o /tmp/test-lns16-sum32 && /tmp/test-lns16-sum32
 ```
 
 ## LNS32 backend
@@ -134,14 +145,34 @@ Two structural caveats:
   work.
 - There is no `GGML_TYPE_LNS32`; all tensors flow as F32.
 
+## LNSCUDA16 / LNSCUDA32 backends (GPU)
+
+The same op set on an NVIDIA GPU, through the xlnscuda submodule. The GPU
+kernels repeat the CPU kernels' LNS operations in the same order with the same
+lookup tables (support for which was added to xlnscuda for this), so LNSCUDA16
+output is bit-identical to LNS16 built with `GGML_LNS16_SUM=base`, and
+LNSCUDA32 matches LNS32 except for last-ulp libm differences in its
+activations. Weights are converted to LNS once and cached in VRAM. Build with
+`./setup.sh --cuda`; details, numbers and limits are in
+[docs/CUDA.md](docs/CUDA.md).
+
 ### Backend selection at runtime
 
-Both backends register as ACCEL devices sharing the CPU buffer type, so the
-scheduler would give every op to whichever registered first.  The
-`GGML_LNS_BACKEND` env var (`16` default, or `32`; any value other than
-exactly `32` selects LNS16) decides which backend claims ops; the other
-declines with audit reason `disabled_by_env` (observable with
-`LNS_OP_AUDIT=1`).
+All LNS backends register as ACCEL devices sharing the CPU buffer type, so the
+scheduler would give every op to whichever registered first. The
+`GGML_LNS_BACKEND` env var decides which backends claim ops; the others
+decline with audit reason `disabled_by_env` (observable with
+`LNS_OP_AUDIT=1`):
+
+| `GGML_LNS_BACKEND` | Devices that claim ops |
+|---|---|
+| unset, `16` | LNS16 |
+| `32` | LNS32 |
+| `cuda`, `cuda16` | LNSCUDA16, with LNS16 for the ops the GPU backend does not implement |
+| `cuda32` | LNSCUDA32, with LNS32 as fallback |
+| device names, comma-separated | exactly those (e.g. `LNSCUDA16` alone disables the fallback) |
+
+Unknown values are reported and ignored (falling back to LNS16).
 
 ---
 
@@ -150,6 +181,7 @@ declines with audit reason `disabled_by_env` (observable with
 | Dependency | Purpose |
 |---|---|
 | [xlnscpp](https://github.com/xlnsresearch/xlnscpp) | C++ LNS library — included as a **git submodule** |
+| [xlnscuda](https://github.com/xlnsresearch/xlnscuda) | CUDA LNS backend — included as a **git submodule** |
 | [ggml](https://github.com/ggml-org/ggml) | Tensor runtime for the backend and unit test |
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) | End-to-end LLM inference validation |
 
@@ -174,17 +206,24 @@ This ensures `#include "xlns16.cpp"` resolves correctly in the backend.
 
 | Path | Contents |
 |---|---|
-| `lns-backend/include/` | Public API headers (`ggml-lns.h`, `ggml-lns32.h`) |
+| `lns-backend/include/` | Public API headers (`ggml-lns.h`, `ggml-lns32.h`, `ggml-lns-cuda.h`) |
+| `lns-backend/common/` | Shared by all backends: the backend framework, op-support predicates, runtime configuration, CMake helper ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)) |
 | `lns-backend/src/` | LNS16 backend (`ggml-lns.cpp`, `lns-ops.h`, `lns-ops.cpp`, `lns16-sum32.h`, `CMakeLists.txt`) |
 | `lns-backend/src32/` | LNS32 backend (`ggml-lns32.cpp`, `lns32-ops.h`, `lns32-ops.cpp`, `CMakeLists.txt`) |
-| `lns-backend/test-lns-backend.cpp` | Validation tests (runs against either backend) |
-| `lns-backend/test-lns16-sum32.cpp` | Standalone sum32 invariant checks (needs no ggml) |
+| `lns-backend/cuda/` | LNSCUDA16/32 backends: device registration, op handlers, device context and weight cache, kernels ([docs/CUDA.md](docs/CUDA.md)) |
+| `lns-backend/tests/test-lns-backend.cpp` | Validation tests (runs against any LNS device) |
+| `lns-backend/tests/test-lns-cuda-parity.cpp` | GPU-vs-CPU parity: LNSCUDA16 vs LNS16, LNSCUDA32 vs LNS32 |
+| `lns-backend/tests/test-lns16-sum32.cpp` | Standalone sum32 invariant checks (needs no ggml) |
 | `xlnscpp/` | xlnscpp submodule (16- and 32-bit LNS library); used at the pinned commit, advanced only by `--update` |
+| `xlnscuda/` | xlnscuda submodule (CUDA LNS library); used as checked out |
+| `docs/` | Architecture, GPU backend, and local-LLM guides |
 | `patches/` | Pinned base commits for xlnscpp/ggml/llama.cpp + fallback patches (`ggml-core.patch`, `llama-core.patch`) |
-| `scripts/integrate-lns.sh` | Regex integration of the LNS hooks into ggml/llama.cpp |
+| `scripts/lns-backends.sh` | The manifest: every backend and how it hooks into ggml |
+| `scripts/integrate-lns.sh` | Integration of the LNS hooks into ggml/llama.cpp, driven by the manifest |
 | `scripts/validate-latest.sh` | Compatibility gate against latest upstream |
 | `scripts/lns-vs-cpu-quality.sh` | LNS-vs-CPU token-match + perplexity gate |
 | `scripts/rc-logits.cpp` | Dump one forward pass's final-token logit vector |
+| `scripts/lns-op-coverage.py` | Summarise an `LNS_OP_AUDIT=1` log: which backend runs each op, and which ops no LNS backend claims |
 | `scripts/logit-compare.py` | Grade two logit dumps (rms / corr / rank) |
 | `results/sum32-evidence/` | Committed evidence artefacts for the summation-mode measurements (see [SETUP.md](SETUP.md#regenerating-the-evidence-artefacts); bulk logit dumps are not shipped) |
 | `setup.sh` | Automated build and run script |
@@ -198,18 +237,21 @@ Model `.gguf` files are deliberately gitignored — download them per
 
 ## Core ggml changes (applied automatically by `setup.sh`)
 
-The LNS hooks are applied by regex (`scripts/integrate-lns.sh`), falling back
-to `patches/ggml-core.patch` / `patches/llama-core.patch` if the regexes no
-longer match.  Paths below are relative to the fetched ggml tree, which
-`setup.sh` keeps at `build/ggml` (and inside llama.cpp's vendored `ggml/`):
+The LNS hooks are applied by `scripts/integrate-lns.sh` for every backend in
+the manifest `scripts/lns-backends.sh`, falling back to
+`patches/ggml-core.patch` / `patches/llama-core.patch` if an anchor no longer
+matches. The per-backend hooks are generated blocks between
+`>>> xlns-ggml-backend:` marker comments, rewritten on every run. Paths below
+are relative to the fetched ggml tree, which `setup.sh` keeps at `build/ggml`
+(and inside llama.cpp's vendored `ggml/`):
 
 | File | Change |
 |---|---|
 | `include/ggml.h` | Insert `GGML_TYPE_LNS16` at the current `GGML_TYPE_COUNT` value, then bump `GGML_TYPE_COUNT` by 1 |
 | `src/ggml.c` | Register LNS16 type traits (`blck_size=1`, `type_size=2`, not quantized) |
-| `CMakeLists.txt` | Add `GGML_LNS` and `GGML_LNS32` CMake options (default OFF) |
-| `src/CMakeLists.txt` | Add `ggml_add_backend(LNS)` and `ggml_add_backend(LNS32)` |
-| `src/ggml-backend-reg.cpp` | Add `#ifdef GGML_USE_LNS` / `#ifdef GGML_USE_LNS32` includes and registrations |
+| `CMakeLists.txt` | Add `GGML_LNSCUDA`, `GGML_LNS` and `GGML_LNS32` CMake options (default OFF) |
+| `src/CMakeLists.txt` | Add `ggml_add_backend(...)` for each |
+| `src/ggml-backend-reg.cpp` | Add each backend's include and registration (GPU backends first) |
 
 ### Build and validate
 
@@ -221,7 +263,9 @@ The supported path needs no model:
 
 It clones ggml at the pinned commit into `build/ggml`, applies the hooks,
 copies the backend sources and the test into the tree, and builds + runs
-`test-lns-backend` once per summation mode plus once for LNS32.
+`test-lns-backend` once per summation mode plus once for LNS32. With
+`--cuda` it also builds the GPU backends and runs `test-lns-cuda-parity` and
+`test-lns-backend` on LNSCUDA16/LNSCUDA32.
 
 The manual equivalent, after `setup.sh` has prepared `build/ggml` at least
 once.  Every flag matters: BLAS and Metal default ON on macOS, and a

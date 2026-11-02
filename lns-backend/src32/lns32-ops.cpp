@@ -818,8 +818,11 @@ void lns32_rope(struct ggml_tensor * dst) {
     // Same limitations as the LNS16 backend: freq_scale/ext_factor/attn_factor/
     // beta_fast/beta_slow/n_ctx_orig are ignored (not required by the
     // validated models).
+    // YaRN, linear scaling and attention scaling are declined by
+    // lns::check_rope; only the optional frequency factors (src[2]) apply.
     (void)n_ctx_orig; (void)ext_factor; (void)attn_factor;
     (void)beta_fast; (void)beta_slow; (void)freq_scale;
+    const float * freq_factors = dst->src[2] ? (const float *) dst->src[2]->data : nullptr;
 
     const float theta_scale = powf(freq_base, -2.0f / n_dims);
 
@@ -834,8 +837,9 @@ void lns32_rope(struct ggml_tensor * dst) {
 
                 float t = (float)pos;
                 for (int64_t j = 0; j < n_dims; j += 2) {
-                    float cos_t = cosf(t);
-                    float sin_t = sinf(t);
+                    const float theta = freq_factors ? t / freq_factors[j / 2] : t;
+                    float cos_t = cosf(theta);
+                    float sin_t = sinf(theta);
 
                     // Convert cos/sin to xlns32 for the rotation
                     xlns32 c     = fp2xlns32(cos_t);

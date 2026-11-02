@@ -6,6 +6,7 @@
 #   ./run.sh --sum-mode=sum32         # pick a summation-variant binary
 #   ./run.sh --sum-mode=all           # run the same prompt across all four variants
 #   ./run.sh --backend=32             # LNS32; default -n 4
+#   ./run.sh --backend=cuda16         # LNS16 arithmetic on the GPU (build with ./setup.sh --cuda)
 #   ./run.sh -m ./other.gguf -n 40
 #   ./run.sh -p "Hello" -- --temp 0.2 # extra args after -- go to llama-completion
 #
@@ -38,16 +39,26 @@ Does not rebuild; each summation mode is a separate compile-time binary.
 Options:
   --sum-mode=MODE     base|monte|lpvip|sum32|all (default: base, or $LNS16_SUM)
                       'all' runs the same prompt through every variant in turn
-  --backend=16|32     LNS backend (default: 16, or $GGML_LNS_BACKEND)
+  --backend=B         LNS backend (default: 16, or $GGML_LNS_BACKEND):
+                        16      LNS16 on the CPU
+                        32      LNS32 on the CPU
+                        cuda16  LNS16 arithmetic on a CUDA GPU (alias: cuda)
+                        cuda32  LNS32 arithmetic on a CUDA GPU
+                      The GPU backends need ./setup.sh --cuda; ops they do not
+                      implement run on the matching CPU LNS backend.
   -m, --model PATH    GGUF model path (default: $MODEL / $MODEL_SMOLLM /
                       SmolLM2-135M-Instruct-Q4_K_M.gguf in repo root)
   -p, --prompt TEXT   Prompt (default: "The capital of France is")
-  -n, --tokens N      Tokens to predict (default: 20 for LNS16, 4 for LNS32)
+  -n, --tokens N      Tokens to predict (default: 4 for CPU LNS32, else 20)
   -h, --help          Show this help
 
 Environment:
   LNS16_SUM           Same as --sum-mode
-  GGML_LNS_BACKEND    Same as --backend (16 or 32)
+  GGML_LNS_BACKEND    Same as --backend
+  GGML_LNS_CUDA_DEVICE  GPU index for the cuda backends (default 0)
+  GGML_LNS_CUDA_CACHE_MB
+                      VRAM budget for weights converted to LNS (default:
+                      free VRAM minus 768 MiB)
   MODEL / MODEL_SMOLLM
                       Default model path
   LNS_OP_AUDIT=1      Print one JSON line per supports_op query
@@ -57,6 +68,7 @@ Examples:
   ./run.sh --sum-mode=sum32
   ./run.sh --sum-mode=all -n 8
   ./run.sh --backend=32
+  ./run.sh --backend=cuda16 -m ./qwen2.5-0.5b-instruct-q8_0.gguf -n 64
   ./run.sh -m ./Llama-3.2-1B-Instruct-Q4_K_M.gguf -n 40
   ./run.sh -p "Hello" -- --temp 0.2 --seed 1
 
@@ -90,7 +102,7 @@ while [ $# -gt 0 ]; do
             ;;
         --backend)
             if [ $# -lt 2 ]; then
-                echo "ERROR: --backend requires 16 or 32" >&2
+                echo "ERROR: --backend requires 16, 32, cuda16 or cuda32" >&2
                 exit 1
             fi
             BACKEND="$2"
@@ -148,9 +160,9 @@ case "$SUM_MODE" in
 esac
 
 case "$BACKEND" in
-    16|32) ;;
+    16|32|cuda|cuda16|cuda32) ;;
     *)
-        echo "ERROR: --backend must be 16 or 32 (got '$BACKEND')" >&2
+        echo "ERROR: --backend must be 16, 32, cuda16 or cuda32 (got '$BACKEND')" >&2
         exit 1
         ;;
 esac
@@ -197,7 +209,7 @@ run_one() {
     local llama_bin
     llama_bin="$(bin_for_mode "$mode")" || exit 1
 
-    echo "==> Running LNS inference (backend: LNS$BACKEND, sum mode: $mode, n=$N_TOKENS)"
+    echo "==> Running LNS inference (GGML_LNS_BACKEND=$BACKEND, sum mode: $mode, n=$N_TOKENS)"
     echo "    model: $MODEL"
     echo "    bin:   $llama_bin"
 

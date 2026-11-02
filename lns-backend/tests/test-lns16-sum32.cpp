@@ -6,10 +6,11 @@
 //
 // Build (from the repo root):
 //   g++ -O2 -std=c++17 -I xlnscpp -I lns-backend/src \
-//       lns-backend/test-lns16-sum32.cpp -o /tmp/test-lns16-sum32 && /tmp/test-lns16-sum32
+//       lns-backend/tests/test-lns16-sum32.cpp -o /tmp/test-lns16-sum32 && /tmp/test-lns16-sum32
 //
 // Exit code 0 = all checks pass.
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>

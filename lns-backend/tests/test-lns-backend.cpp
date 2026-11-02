@@ -12,12 +12,16 @@
 // Test the LNS backends with the same matrix multiply as simple-backend.cpp
 //
 // Usage: test-lns-backend [DEVICE] [PROFILE]
-//   DEVICE  — backend device name to test: LNS16 (default) or LNS32
+//   DEVICE  — backend device name to test: LNS16 (default), LNS32,
+//             LNSCUDA16 or LNSCUDA32. A CUDA device is tested the way it runs
+//             in llama.cpp: ops it declines fall back to the matching CPU LNS
+//             backend (GGML_LNS_BACKEND=cuda16 / cuda32).
 //   PROFILE — tolerance profile: base (default) | monte | lpvip | sum32
 //             (must match the GGML_LNS16_SUM mode the backend was built with —
 //             this is cross-checked against the device description, so a
 //             mismatched profile is an error, not a silently wrong grade;
-//             ignored for LNS32, which always uses its own tight profile)
+//             ignored for the 32-bit devices, which always use their own
+//             tight profile; LNSCUDA16 implements base only)
 
 // Per-mode tolerances for the summation-dependent tests. The elementwise
 // tests (div/swiglu/geglu/tanh/clamp/argsort) keep their fixed tolerances —
@@ -1198,7 +1202,11 @@ static bool run_argsort_test(ggml_backend_sched_t sched) {
 
 int main(int argc, char ** argv) {
     const char * dev_name = argc > 1 ? argv[1] : "LNS16";
-    const bool is_lns32 = strcmp(dev_name, "LNS32") == 0;
+    const bool is_cuda  = strncmp(dev_name, "LNSCUDA", 7) == 0;
+    const bool is_lns32 = strcmp(dev_name, "LNS32") == 0 || strcmp(dev_name, "LNSCUDA32") == 0;
+    // The CPU LNS backend a CUDA device falls back to (and the one that
+    // computes LNS16-typed tensors).
+    const char * cpu_lns_name = is_lns32 ? "LNS32" : "LNS16";
     g_device_is_lns16 = !is_lns32;
 
     // Tolerance profile: LNS32 always uses its own tight profile; for LNS16
@@ -1224,7 +1232,7 @@ int main(int argc, char ** argv) {
     // Route ops to the device under test. setenv with overwrite=0 respects an
     // externally set GGML_LNS_BACKEND; must happen before any ggml call (the
     // backends cache the selection on first use).
-    setenv("GGML_LNS_BACKEND", is_lns32 ? "32" : "16", 0);
+    setenv("GGML_LNS_BACKEND", is_cuda ? (is_lns32 ? "cuda32" : "cuda16") : (is_lns32 ? "32" : "16"), 0);
 
     ggml_time_init();
 
@@ -1233,7 +1241,8 @@ int main(int argc, char ** argv) {
     // Try to init the requested LNS backend by name
     ggml_backend_t lns_backend = ggml_backend_init_by_name(dev_name, nullptr);
     if (!lns_backend) {
-        fprintf(stderr, "ERROR: %s backend not found! Make sure ggml was built with -DGGML_LNS=ON -DGGML_LNS32=ON\n", dev_name);
+        fprintf(stderr, "ERROR: %s backend not found! Make sure ggml was built with -DGGML_LNS=ON -DGGML_LNS32=ON%s\n",
+                dev_name, is_cuda ? " -DGGML_LNSCUDA=ON, on a machine with a CUDA GPU" : "");
         return 1;
     }
 
@@ -1260,13 +1269,26 @@ int main(int argc, char ** argv) {
 
     ggml_backend_t cpu_backend = ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, nullptr);
 
-    ggml_backend_t backends[2] = { lns_backend, cpu_backend };
-    ggml_backend_sched_t sched = ggml_backend_sched_new(backends, nullptr, 2, GGML_DEFAULT_GRAPH_SIZE, false, true);
+    ggml_backend_t cpu_lns_backend = is_cuda ? ggml_backend_init_by_name(cpu_lns_name, nullptr) : lns_backend;
+    if (!cpu_lns_backend) {
+        fprintf(stderr, "ERROR: %s backend not found\n", cpu_lns_name);
+        return 1;
+    }
+
+    // Priority order, as in llama.cpp: the device under test, its CPU LNS
+    // fallback (CUDA devices only), then the plain CPU backend.
+    std::vector<ggml_backend_t> backends = { lns_backend };
+    if (is_cuda) {
+        backends.push_back(cpu_lns_backend);
+    }
+    backends.push_back(cpu_backend);
+    ggml_backend_sched_t sched = ggml_backend_sched_new(backends.data(), nullptr, (int) backends.size(),
+                                                        GGML_DEFAULT_GRAPH_SIZE, false, true);
 
     bool pass = true;
     pass = run_mul_mat_test(sched) && pass;
     pass = run_mul_mat_long_test(sched) && pass;
-    pass = run_mul_mat_id_test(sched, lns_backend) && pass;
+    pass = run_mul_mat_id_test(sched, cpu_lns_backend) && pass;
     pass = run_div_test(sched) && pass;
     pass = run_swiglu_test(sched, "LNS swiglu split", true, false) && pass;
     pass = run_swiglu_test(sched, "LNS swiglu fused", false, false) && pass;
@@ -1283,6 +1305,9 @@ int main(int argc, char ** argv) {
     pass = run_rope_test(sched) && pass;
 
     ggml_backend_sched_free(sched);
+    if (cpu_lns_backend != lns_backend) {
+        ggml_backend_free(cpu_lns_backend);
+    }
     ggml_backend_free(lns_backend);
     ggml_backend_free(cpu_backend);
 
