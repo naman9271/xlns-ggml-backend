@@ -4,6 +4,9 @@
 // no xlns16_ideal), with xlnscuda's xlns16d_table mirroring the host tables
 // on the device. Every conversion, addition and lookup therefore returns the
 // same bits on both sides; xlnscuda/tests/chkxlns16d_table.cu checks that.
+// Reductions follow GGML_LNS16_SUM like LNS16: base, monte (xlns16d_monte.cu)
+// or lpvip (xlns32d_lpvip.cu); xlnscuda/tests/chkxlns16d_sum_modes.cu checks
+// those against xlnscpp.
 
 // System headers first: the library includes below sit in a namespace, where
 // their own nested includes of these headers must be no-ops.
@@ -14,6 +17,10 @@
 #include <stdlib.h>
 
 #include "lns-cuda-kernels.h"
+
+#if defined(GGML_LNS16_SUM_LPVIP) || (defined(GGML_LNS16_SUM_MONTE) && defined(GGML_LNS16_MONTE_BYLPVIP))
+#define LNS_CUDA_LPVIP
+#endif
 
 // The xlnscpp/xlnscuda sources carry non-inline definitions and their own
 // globals, so each may appear in one translation unit per link unit; the
@@ -31,13 +38,71 @@ using ::pow; using ::sin; using ::sqrt; using ::tanh;
 #define xlns16_alt
 #define xlns16d_table
 #include "xlns16.cpp"
+#ifdef LNS_CUDA_LPVIP
+#include "xlns32lpvip.cpp"   // xlns32 with xlns32_ideal + xlns32_aicasb, private to this file
+#endif
 #include "xlns16d.cu"
+#ifdef LNS_CUDA_LPVIP
+#include "xlns32d_lpvip.cu"
+#endif
+#ifdef GGML_LNS16_SUM_MONTE
+#ifdef GGML_LNS16_MONTE_BYLPVIP
+#define xlns16d_monte_bylpvip
+#endif
+#include "xlns16d_monte.cu"
+#endif
 
 struct xlns16_arith {
     using value = xlns16;
     static constexpr const char * name = "xlns16";
     static constexpr value zero    = xlns16_zero;
     static constexpr value neg_inf = xlns16_neg_inf;
+
+#if defined(GGML_LNS16_SUM_MONTE)
+    static constexpr const char * sum_mode = "monte";
+  #ifdef GGML_LNS16_MONTE_BYLPVIP
+    static constexpr const char * monte_impl = "bylpvip";
+  #else
+    static constexpr const char * monte_impl = "pure16";
+  #endif
+    // xlns16 accumulator, one LFSR draw per addition
+    struct reduction {
+        using acc   = xlns16;
+        using state = xlns16;
+        static constexpr bool stochastic = true;
+        __device__ static state start(unsigned seed, uint64_t index, uint64_t draws) {
+            return xlns16_lfsr_jump((xlns16) seed, xlns16_lfsr_offset(index, draws));
+        }
+        __device__ static acc    from(xlns16 v)                    { return v; }
+        __device__ static acc    add(acc a, xlns16 t, state & s)   { return xlns16d_add_monte(a, t, &s); }
+        __device__ static xlns16 finish(acc a)                     { return a; }
+    };
+#elif defined(GGML_LNS16_SUM_LPVIP)
+    static constexpr const char * sum_mode   = "lpvip";
+    static constexpr const char * monte_impl = nullptr;
+    // 32-bit LPVIP accumulator; xlns16 storage is unchanged
+    struct reduction {
+        using acc = xlns32;
+        struct state {};
+        static constexpr bool stochastic = false;
+        __device__ static state  start(unsigned, uint64_t, uint64_t) { return {}; }
+        __device__ static acc    from(xlns16 v)                     { return xlns16_lpvip32_widen(v); }
+        __device__ static acc    add(acc a, xlns16 t, state &)      { return xlns16d_lpvip32_add(a, t); }
+        __device__ static xlns16 finish(acc a)                      { return xlns16_lpvip32_narrow(a); }
+    };
+#else
+    static constexpr const char * sum_mode   = "base";
+    static constexpr const char * monte_impl = nullptr;
+    struct reduction {
+        using acc = xlns16;
+        struct state {};
+        static constexpr bool stochastic = false;
+        __device__ static state  start(unsigned, uint64_t, uint64_t) { return {}; }
+        __device__ static acc    from(xlns16 v)                     { return v; }
+        __device__ static acc    add(acc a, xlns16 t, state &)      { return xlns16d_add(a, t); }
+        __device__ static xlns16 finish(acc a)                      { return a; }
+    };
+#endif
 
     static cudaError_t upload_tables() { return xlns16d_table_init(); }
 
