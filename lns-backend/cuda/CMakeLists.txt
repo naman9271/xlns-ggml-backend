@@ -2,7 +2,7 @@
 #
 # Needs only the CUDA toolkit (nvcc + cudart), not ggml's own CUDA backend.
 # Useful cache variables:
-#   GGML_LNS16_SUM             base|monte|lpvip (shared with LNS16; sum32 -> base)
+#   GGML_LNS16_SUM             base|monte|lpvip|sum32 (shared with LNS16)
 #   XLNSCUDA_DIR               xlnscuda checkout (default: next to xlnscpp)
 #   CMAKE_CUDA_ARCHITECTURES   default "native" (the GPUs in this machine)
 #   CMAKE_CUDA_HOST_COMPILER   a host compiler your nvcc accepts, e.g. g++-12
@@ -64,8 +64,8 @@ endif()
 target_include_directories(ggml-lnscuda PRIVATE "${XLNSCUDA_DIR}")
 
 # xlns16 summation mode (GGML_LNS16_SUM, shared with LNS16): only the xlns16
-# translation unit gets its definitions. sum32 has no GPU version (base).
-lns16_sum_mode_defines(LNS_CUDA16_MODE_DEFS CUDA)
+# translation unit gets its definitions.
+lns16_sum_mode_defines(LNS_CUDA16_MODE_DEFS)
 if (LNS_CUDA16_MODE_DEFS)
     set_property(SOURCE lns-cuda-xlns16.cu APPEND PROPERTY COMPILE_DEFINITIONS ${LNS_CUDA16_MODE_DEFS})
 endif()

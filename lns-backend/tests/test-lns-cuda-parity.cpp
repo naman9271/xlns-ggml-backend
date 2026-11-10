@@ -17,8 +17,8 @@
 // Usage: test-lns-cuda-parity [--only=cuda16|cuda32] [--expect-sum=MODE]
 //
 // LNSCUDA16 must be bit-identical to LNS16 built with the same GGML_LNS16_SUM
-// (base, monte or lpvip); the test reads both modes from the device
-// descriptions and refuses a pair whose modes differ (e.g. a sum32 build).
+// (base, monte, lpvip or sum32); the test reads both modes from the device
+// descriptions and refuses a pair whose modes differ (mixed libraries).
 // For monte, every comparison starts CPU and GPU from the same LFSR state
 // (LNS16's Monte state, via its registry), and the test also checks draw
 // counts, runs without a reset in between, a second GPU backend instance and
@@ -603,7 +603,7 @@ int main(int argc, char ** argv) {
         } else if (std::strncmp(argv[i], "--expect-sum=", 13) == 0) {
             expect_sum = argv[i] + 13;
         } else {
-            std::fprintf(stderr, "usage: %s [--only=cuda16|cuda32] [--expect-sum=base|monte|lpvip]\n", argv[0]);
+            std::fprintf(stderr, "usage: %s [--only=cuda16|cuda32] [--expect-sum=base|monte|lpvip|sum32]\n", argv[0]);
             return 1;
         }
     }
@@ -639,7 +639,7 @@ int main(int argc, char ** argv) {
         }
         if (cpu_mode != gpu_mode || cpu_impl != gpu_impl) {
             std::printf("ERROR: LNSCUDA16 runs sum=%s%s%s but LNS16 runs sum=%s%s%s: no parity reference in this "
-                        "build (GPU sum32 is not implemented; rebuild with GGML_LNS16_SUM=base|monte|lpvip)\n",
+                        "build (LNS16 and LNSCUDA16 come from different builds; rebuild both with one GGML_LNS16_SUM)\n",
                         gpu_mode.c_str(), gpu_impl.empty() ? "" : ", monte=", gpu_impl.c_str(), cpu_mode.c_str(),
                         cpu_impl.empty() ? "" : ", monte=", cpu_impl.c_str());
             return 1;

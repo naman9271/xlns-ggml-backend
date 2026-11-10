@@ -18,7 +18,7 @@
 //     xlns16_vec_dot / xlns16_sum: LNS addition is not associative, so a
 //     parallel tree reduction would give different (if not worse) numbers.
 //     How they accumulate follows the xlns16 summation mode (GGML_LNS16_SUM:
-//     base, monte or lpvip), as in the CPU backend.
+//     base, monte, lpvip or sum32), as in the CPU backend.
 //   * Monte reductions take random draws. Each call gets the LFSR state where
 //     its first reduction starts (monte_seed); reduction i starts i * draws
 //     later, i.e. in the CPU's sequential order.

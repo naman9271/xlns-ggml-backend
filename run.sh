@@ -7,7 +7,7 @@
 #   ./run.sh --sum-mode=all           # run the same prompt across all four variants
 #   ./run.sh --backend=32             # LNS32; default -n 4
 #   ./run.sh --backend=cuda16 --sum-mode=monte   # LNS16 on the GPU (./setup.sh --cuda);
-#                                     # cuda16 has base|monte|lpvip, 'all' runs those three
+#                                     # cuda16 has the same 4 modes as the CPU
 #   ./run.sh -m ./other.gguf -n 40
 #   ./run.sh -p "Hello" -- --temp 0.2 # extra args after -- go to llama-completion
 #
@@ -45,7 +45,7 @@ Options:
                         16      LNS16 on the CPU
                         32      LNS32 on the CPU
                         cuda16  LNS16 arithmetic on a CUDA GPU (alias: cuda);
-                                sum modes base|monte|lpvip (no GPU sum32)
+                                sum modes base|monte|lpvip|sum32, as on the CPU
                         cuda32  LNS32 arithmetic on a CUDA GPU
                       The GPU backends need ./setup.sh --cuda; ops they do not
                       implement run on the matching CPU LNS backend.
@@ -171,14 +171,7 @@ case "$BACKEND" in
         ;;
 esac
 
-if [ "$BACKEND" = cuda16 ]; then
-    if [ "$SUM_MODE" = sum32 ]; then
-        echo "ERROR: --backend=cuda16 --sum-mode=sum32 is not supported (no GPU sum32);" >&2
-        echo "       use --backend=16 for sum32, or base|monte|lpvip on the GPU" >&2
-        exit 1
-    fi
-    ALL_MODES=(base monte lpvip)
-elif [ "$BACKEND" = 32 ] || [ "$BACKEND" = cuda32 ]; then
+if [ "$BACKEND" = 32 ] || [ "$BACKEND" = cuda32 ]; then
     if [ "$SUM_MODE" != base ]; then
         echo "NOTE: --sum-mode does not apply to --backend=$BACKEND (xlns32 has one summation); running once" >&2
     fi

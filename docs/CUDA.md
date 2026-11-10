@@ -6,7 +6,7 @@ They exist to make LNS inference fast enough to use; they are not a different
 numerical experiment:
 
 - **LNSCUDA16 is bit-identical to LNS16** built with the same
-  `GGML_LNS16_SUM`: `base`, `monte` or `lpvip` (no GPU `sum32`).
+  `GGML_LNS16_SUM`: `base`, `monte`, `lpvip` or `sum32`, the same four modes.
   Every logit, and so every generated token, matches the CPU backend.
 - **LNSCUDA32 matches LNS32** bit for bit in everything integer-only (mat-mul,
   add/mul/div, rms_norm, rope); its float-based activations can differ in the
@@ -33,18 +33,20 @@ For how this fits next to the CPU backends, see [ARCHITECTURE.md](ARCHITECTURE.m
 ```bash
 git submodule update --init                       # xlnscpp + xlnscuda
 
-# all modes at once (base, monte, lpvip, sum32; sum32 is CPU-only), tests only
+# all four modes at once (base, monte, lpvip, sum32), tests only
 ./setup.sh --cuda --unit-test --skip-inference
 
 # one GPU mode at a time: build + tests (no model needed)
 ./setup.sh --cuda --sum-mode=base  --unit-test --skip-inference
 ./setup.sh --cuda --sum-mode=monte --unit-test --skip-inference
 ./setup.sh --cuda --sum-mode=lpvip --unit-test --skip-inference
+./setup.sh --cuda --sum-mode=sum32 --unit-test --skip-inference
 
 # one GPU mode at a time: build + tests + SmolLM2 inference (CPU and GPU)
 ./setup.sh --cuda --sum-mode=base  --unit-test
 ./setup.sh --cuda --sum-mode=monte --unit-test
 ./setup.sh --cuda --sum-mode=lpvip --unit-test
+./setup.sh --cuda --sum-mode=sum32 --unit-test
 # Monte through LPVIP (GGML_LNS16_MONTE_BYLPVIP=ON) is not a setup.sh option;
 # build it by hand after setup has prepared build/ggml:
 cmake -S build/ggml -B build/ggml/build-lns-monte-bylpvip -DGGML_LNS=ON -DGGML_LNS32=ON -DGGML_LNSCUDA=ON \
@@ -57,15 +59,15 @@ cmake --build build/ggml/build-lns-monte-bylpvip --target test-lns-cuda-parity t
 ./run.sh --backend=cuda16 --sum-mode=base  -- --temp 0 --seed 1
 ./run.sh --backend=cuda16 --sum-mode=monte -- --temp 0 --seed 1
 ./run.sh --backend=cuda16 --sum-mode=lpvip -- --temp 0 --seed 1
-./run.sh --backend=cuda16 --sum-mode=all   -- --temp 0 --seed 1   # base, monte, lpvip in turn
+./run.sh --backend=cuda16 --sum-mode=sum32 -- --temp 0 --seed 1
+./run.sh --backend=cuda16 --sum-mode=all   -- --temp 0 --seed 1   # all four modes in turn
 ./run.sh --backend=16     --sum-mode=monte -- --temp 0 --seed 1   # same tree on the CPU: same text
 ./run.sh --backend=cuda32                                         # LNS32 arithmetic on the GPU
 ```
 
 `--cuda` (or `LNS_CUDA=1`) adds `-DGGML_LNSCUDA=ON` to every LNS build. With
 `--unit-test` it also runs `xlnscuda/tests/chkxlns16d_sum_modes.cu` (device
-Monte/LPVIP vs xlnscpp) and, in each `base` / `monte` / `lpvip` build (a
-`sum32` build's LNSCUDA16 runs base and is not tested; LNSCUDA32 once):
+Monte/LPVIP vs xlnscpp) and, in each mode's build (LNSCUDA32 once):
 
 - `test-lns-cuda-parity`: LNSCUDA16 against LNS16 and LNSCUDA32 against LNS32,
   op by op (with quantized, F16 and F32 weights, broadcasting, permuted KV-cache
@@ -183,7 +185,11 @@ and checks the device description (`sum=monte, monte=pure16`) before running.
   its own start, so GPU, CPU-fallback ops (`MUL_MAT_ID`) and an all-CPU run
   use the same sequence. The state keeps advancing across ops and tokens;
   each process starts at 7. SmolLM2: 11.9 tok/s.
-- `sum32`: CPU only; LNSCUDA16 runs `base` in such a build and says so.
+- `sum32`: xlns16 terms widened exactly into an xlns32 accumulator, added
+  with xlnscuda's table-based `xlns32d_add` (the same xlns32 configuration as
+  LNS32: table `sb`, cotransformation `db`), narrowed once with
+  round-to-nearest, as in `lns-backend/src/lns16-sum32.h`. The most accurate
+  mode, and it needs no extra xlnscuda code: CUDA32 already uses that adder.
 
 ## Memory model
 
@@ -257,8 +263,8 @@ never include ggml. Adding an LNS format is one more `.cu` file and a
   remaining ops (`GET_ROWS`, `SET_ROWS`, copies) on the GPU too.
 - **Sequential reductions** keep parity but limit single-token mat-mul to one
   thread per output row; prompt processing parallelises across tokens.
-- No `sum32` on the GPU. Monte and LPVIP keep their algorithmic limits on
-  the GPU (LPVIP is poor on mixed-sign cancellation).
+- Monte and LPVIP keep their algorithmic limits on the GPU (LPVIP is poor on
+  mixed-sign cancellation).
 - RoPE: no YaRN or linear scaling (declined, so those nodes run on the CPU
   backend in F32).
 - One GPU per process (`GGML_LNS_CUDA_DEVICE`); `GGML_BACKEND_DL=ON` builds are

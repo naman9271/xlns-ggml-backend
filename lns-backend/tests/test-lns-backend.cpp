@@ -21,7 +21,7 @@
 //             this is cross-checked against the device description, so a
 //             mismatched profile is an error, not a silently wrong grade;
 //             ignored for the 32-bit devices, which always use their own
-//             tight profile). LNSCUDA16 implements base, monte and lpvip; its
+//             tight profile). LNSCUDA16 implements all four modes; its
 //             CPU fallback LNS16 must report the same mode.
 //             Monte starts from seed 7 (ggml-lns.h) for reproducible numbers.
 

@@ -28,13 +28,9 @@ if (NOT GGML_LNS16_SUM MATCHES "^(base|monte|lpvip|sum32)$")
     message(FATAL_ERROR "GGML_LNS16_SUM must be one of: base, monte, lpvip, sum32 (got '${GGML_LNS16_SUM}')")
 endif()
 
-# Compile definitions of the mode; kind is CPU or CUDA (no GPU sum32: base).
-function(lns16_sum_mode_defines out_var kind)
+# Compile definitions of the mode (the same for LNS16 and LNSCUDA16).
+function(lns16_sum_mode_defines out_var)
     set(mode "${GGML_LNS16_SUM}")
-    if (kind STREQUAL "CUDA" AND mode STREQUAL "sum32")
-        message(WARNING "GGML_LNS16_SUM=sum32 has no CUDA implementation; LNSCUDA16 runs base in this build")
-        set(mode "base")
-    endif()
     set(defs "")
     if (mode STREQUAL "monte")
         list(APPEND defs GGML_LNS16_SUM_MONTE)

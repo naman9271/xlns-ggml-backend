@@ -92,10 +92,6 @@ case "$SUM_MODE" in
     ""|base|monte|lpvip|sum32) ;;
     *) echo "ERROR: --sum-mode must be base, monte, lpvip or sum32" >&2; exit 1 ;;
 esac
-if [ "$BACKEND" = cuda16 ] && [ "$SUM_MODE" = sum32 ]; then
-    echo "ERROR: cuda16 has no sum32 (GPU modes: base, monte, lpvip)" >&2
-    exit 1
-fi
 if [ -n "$SUM_MODE" ]; then
     LLAMA_BIN_DIR="${LLAMA_BIN_DIR_SET:-$REPO_ROOT/build/llama.cpp/build-lns-$SUM_MODE/bin}"
 else

@@ -7,7 +7,7 @@
 #   ./scripts/validate-latest.sh [--cuda]
 #
 # --cuda also builds LNSCUDA16/32 and runs the GPU parity tests for the GPU
-# modes (base, monte, lpvip) and GPU inference; it needs an NVIDIA GPU (set
+# modes (base, monte, lpvip, sum32) and GPU inference; it needs an NVIDIA GPU (set
 # CUDAHOSTCXX to a host compiler nvcc accepts, e.g. /usr/bin/g++-12).
 # xlnscpp / xlnscuda are cloned under build/validate-latest/ (the repo's
 # submodules are not touched).
@@ -128,7 +128,7 @@ for mode in base monte sum32 lpvip; do
     cmake --build . --target test-lns-backend $([ "$LNS_CUDA" -eq 1 ] && echo test-lns-cuda-parity) -j"$JOBS" || return 1
     GGML_LNS_BACKEND=16 ./bin/test-lns-backend LNS16 "$mode" || return 1
     log "    PASS: unit test (LNS16, $mode)"
-    if [ "$LNS_CUDA" -eq 1 ] && [ "$mode" != sum32 ]; then
+    if [ "$LNS_CUDA" -eq 1 ]; then
         ./bin/test-lns-cuda-parity --expect-sum="$mode" || return 1   # exit 77 (no GPU) fails too
         ./bin/test-lns-backend LNSCUDA16 "$mode" || return 1
         log "    PASS: GPU parity + unit test (LNSCUDA16, $mode)"
@@ -188,7 +188,7 @@ for mode in base monte sum32 lpvip; do
         -fa 0 \
         -no-cnv 2>&1 | tee -a "$LOG_FILE" || return 1
     log "    PASS: SmolLM2 inference (LNS16, $mode)"
-    if [ "$LNS_CUDA" -eq 1 ] && [ "$mode" != sum32 ]; then
+    if [ "$LNS_CUDA" -eq 1 ]; then
         GGML_LNS_BACKEND=cuda16 "$LLAMA_DIR/build-lns/bin/llama-completion" \
             -m "$MODEL_SMOLLM" -p "The capital of France is" -n 20 -fa 0 -no-cnv 2>&1 | tee -a "$LOG_FILE" || return 1
         log "    PASS: SmolLM2 inference (LNSCUDA16, $mode)"

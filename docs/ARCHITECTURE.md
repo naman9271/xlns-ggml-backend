@@ -10,7 +10,7 @@ backend code; [CUDA.md](CUDA.md) covers the GPU backend in more depth.
 |---|---|---|---|---|
 | `LNS16` | xlnscpp | CPU | xlns16, summation mode chosen at build time (`base` / `monte` / `lpvip` / `sum32`) | `lns-backend/src/` |
 | `LNS32` | xlnscpp | CPU | xlns32 | `lns-backend/src32/` |
-| `LNSCUDA16` | xlnscuda | CUDA GPU | xlns16, bit-identical to `LNS16` built in the same mode (`base` / `monte` / `lpvip`) | `lns-backend/cuda/` |
+| `LNSCUDA16` | xlnscuda | CUDA GPU | xlns16, bit-identical to `LNS16` built in the same mode (`base` / `monte` / `lpvip` / `sum32`) | `lns-backend/cuda/` |
 | `LNSCUDA32` | xlnscuda | CUDA GPU | xlns32, matches `LNS32` (see [CUDA.md](CUDA.md#numerics)) | `lns-backend/cuda/` |
 
 All four are ggml backends of type `ACCEL` that compute on ggml's ordinary

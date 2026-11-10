@@ -88,7 +88,7 @@ works; it was removed in v1.0.
 # Also build the GPU backends (LNSCUDA16/LNSCUDA32), test them against the CPU
 # backends, and run GPU inference; combine with any of the above. Limit the
 # build's parallelism on machines with little RAM with JOBS=N.
-./setup.sh --cuda --unit-test --skip-inference          # GPU modes base, monte, lpvip
+./setup.sh --cuda --unit-test --skip-inference          # all four modes on CPU and GPU
 ./setup.sh --cuda --sum-mode=monte --unit-test --skip-inference
 
 # Explicit model paths (MODEL_LLAMA32 enables the Llama 3.2 1B inference run)
@@ -159,7 +159,7 @@ After a successful `./setup.sh`, re-run the model without rebuilding:
 ./run.sh --sum-mode=sum32         # pick a summation-variant binary
 ./run.sh --sum-mode=all -n 8      # same prompt across all four variants, in sequence
 ./run.sh --backend=32             # LNS32; default -n 4
-./run.sh --backend=cuda16 --sum-mode=lpvip   # GPU, needs ./setup.sh --cuda (no GPU sum32)
+./run.sh --backend=cuda16 --sum-mode=lpvip   # GPU (needs ./setup.sh --cuda); any of the 4 modes
 ./run.sh -m ./other_model_file.gguf -n 40
 ./run.sh -p "Hello" -- --temp 0.2 # extra args after -- go to llama-completion
 ```

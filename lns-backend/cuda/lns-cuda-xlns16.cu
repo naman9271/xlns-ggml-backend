@@ -4,9 +4,9 @@
 // no xlns16_ideal), with xlnscuda's xlns16d_table mirroring the host tables
 // on the device. Every conversion, addition and lookup therefore returns the
 // same bits on both sides; xlnscuda/tests/chkxlns16d_table.cu checks that.
-// Reductions follow GGML_LNS16_SUM like LNS16: base, monte (xlns16d_monte.cu)
-// or lpvip (xlns32d_lpvip.cu); xlnscuda/tests/chkxlns16d_sum_modes.cu checks
-// those against xlnscpp.
+// Reductions follow GGML_LNS16_SUM like LNS16: base, monte (xlns16d_monte.cu),
+// lpvip (xlns32d_lpvip.cu) or sum32 (xlns32d.cu's table-based xlns32 adder, as
+// lns-backend/src/lns16-sum32.h uses xlns32.cpp's).
 
 // System headers first: the library includes below sit in a namespace, where
 // their own nested includes of these headers must be no-ops.
@@ -41,9 +41,15 @@ using ::pow; using ::sin; using ::sqrt; using ::tanh;
 #ifdef LNS_CUDA_LPVIP
 #include "xlns32lpvip.cpp"   // xlns32 with xlns32_ideal + xlns32_aicasb, private to this file
 #endif
+#ifdef GGML_LNS16_SUM_SUM32
+#include "xlns32.cpp"        // xlns32_alt (from CMake): LNS32's table sb + cotransformation db
+#endif
 #include "xlns16d.cu"
 #ifdef LNS_CUDA_LPVIP
 #include "xlns32d_lpvip.cu"
+#endif
+#ifdef GGML_LNS16_SUM_SUM32
+#include "xlns32d.cu"
 #endif
 #ifdef GGML_LNS16_SUM_MONTE
 #ifdef GGML_LNS16_MONTE_BYLPVIP
@@ -90,6 +96,25 @@ struct xlns16_arith {
         __device__ static acc    add(acc a, xlns16 t, state &)      { return xlns16d_lpvip32_add(a, t); }
         __device__ static xlns16 finish(acc a)                      { return xlns16_lpvip32_narrow(a); }
     };
+#elif defined(GGML_LNS16_SUM_SUM32)
+    static constexpr const char * sum_mode   = "sum32";
+    static constexpr const char * monte_impl = nullptr;
+    // xlns32 accumulator (lns16-sum32.h): exact widening, xlns32 add, one
+    // round-to-nearest narrowing; xlns16 storage is unchanged
+    struct reduction {
+        using acc = xlns32;
+        struct state {};
+        static constexpr bool stochastic = false;
+        __device__ static state  start(unsigned, uint64_t, uint64_t) { return {}; }
+        __device__ static acc    from(xlns16 v)                     { return ((xlns32) v) << 16; }
+        __device__ static acc    add(acc a, xlns16 t, state &)      { return xlns32d_add(a, ((xlns32) t) << 16); }
+        __device__ static xlns16 finish(acc s) {
+            if ((s & xlns32_logmask) >= (xlns32) 0x7FFF8000u) {
+                return (xlns16) ((s >> 16) | xlns16_logmask); // saturate
+            }
+            return (xlns16) ((s + 0x8000u) >> 16);
+        }
+    };
 #else
     static constexpr const char * sum_mode   = "base";
     static constexpr const char * monte_impl = nullptr;
@@ -104,7 +129,15 @@ struct xlns16_arith {
     };
 #endif
 
-    static cudaError_t upload_tables() { return xlns16d_table_init(); }
+    static cudaError_t upload_tables() {
+        cudaError_t err = xlns16d_table_init();
+#ifdef GGML_LNS16_SUM_SUM32
+        if (err == cudaSuccess) {
+            err = xlns32d_table_init();
+        }
+#endif
+        return err;
+    }
 
     __device__ static value from_f32(float x)        { return fp2xlns16d(x); }
     __device__ static float to_f32(value v)          { return xlns16d2fp(v); }
