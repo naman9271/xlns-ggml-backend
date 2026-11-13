@@ -23,10 +23,10 @@ For how this fits next to the CPU backends, see [ARCHITECTURE.md](ARCHITECTURE.m
 - A host compiler your `nvcc` accepts. CUDA 12.0 rejects GCC 13; `setup.sh`
   probes the installed `g++` versions and uses the first one that works
   (`g++-12` on Ubuntu 24.04). Override with `CUDAHOSTCXX=/path/to/g++`.
-- An xlnscuda submodule with `xlns16d_monte.cu`, `xlns32d_lpvip.cu` and
-  `tests/chkxlns16d_sum_modes.cu`, and an xlnscpp with the defined-behaviour
-  fixes in `xlns16.cpp` / `xlns32lpvip.cpp` (both proposed upstream; update the
-  submodule pins once they are merged).
+- The xlnscuda and xlnscpp submodules at their pinned commits (xlnscuda
+  `aa5ccf0` or later for `xlns16d_monte.cu`, `xlns32d_lpvip.cu` and
+  `tests/chkxlns16d_sum_modes.cu`; xlnscpp `41843b0` or later for the
+  `xlns16.cpp` / `xlns32lpvip.cpp` fixes).
 
 ## Build, test, run
 
