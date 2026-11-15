@@ -141,4 +141,10 @@ public:
 const kernel_set & xlns16_kernels();
 const kernel_set & xlns32_kernels();
 
+#ifdef GGML_LNSCUDA16_MIXED
+const kernel_set & xlns16_kernels_base();
+const kernel_set & xlns16_kernels_lpvip();
+const kernel_set & xlns16_kernels_sum32();
+#endif
+
 } // namespace lns_cuda

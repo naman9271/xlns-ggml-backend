@@ -20,6 +20,8 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 #define LNS_CUDA_CHECK(expr) ::lns_cuda::check((expr), #expr, __FILE__, __LINE__)
 
@@ -122,6 +124,8 @@ public:
 
     const kernel_set & kernels() const { return arith; }
 
+    const kernel_set & kernels_for(const ggml_tensor * node);
+
     // Monte mode: reserves the next `draws` draws of the process-wide Monte
     // sequence (owned by LNS16, ggml-lns.h) and returns their start state.
     // Ops reserve in graph order, so GPU and CPU-fallback ops draw exactly as
@@ -161,6 +165,9 @@ private:
     int                device      = -1;
     cudaStream_t       cuda_stream = nullptr;
     bool               cache_full_reported = false;
+
+    std::vector<std::pair<std::string, const kernel_set *>> sum_policy;
+    std::vector<const kernel_set *>                          tables_uploaded;
 
     weight_cache                                         weights;
     std::array<device_buffer, (size_t) role::count>      device_scratch;

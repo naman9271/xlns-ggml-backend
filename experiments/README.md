@@ -6,6 +6,7 @@ that produced them so they can be rerun and extended.
 | Folder | What it answers |
 |---|---|
 | [layer-by-layer/](layer-by-layer/) | Where does LNS error enter and how does it grow through an LLM, per backend and summation mode? Does the GPU compute exactly what the CPU computes, at every layer? |
+| [op-sensitivity/](op-sensitivity/) | Which op groups and layers cause the output error of LNS inference, and how few of them need a wider accumulator (sum32) or F32 to get close to the reference? |
 
 ## Configurations
 

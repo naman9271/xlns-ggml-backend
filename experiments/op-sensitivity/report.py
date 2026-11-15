@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+
+import fnmatch
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import runlib  # noqa: E402
+from run import GROUPS, REDUCTION_GROUPS, SEL  # noqa: E402
+
+MODES = ["base", "monte", "lpvip", "sum32"]
+
+
+def name_matches(name, pat):
+    if not name:
+        return False
+    if any(c in pat for c in "*?["):
+        return fnmatch.fnmatchcase(name, pat)
+    return pat in name
+
+
+def op_matches(node, tok):
+    if tok.upper() in (node["op"].upper(), node["desc"].upper()):
+        return True
+    pat = tok
+    if ":" in tok:
+        want, pat = tok.split(":", 1)
+        if want.upper() not in (node["op"].upper(), node["desc"].upper()):
+            return False
+    if pat.startswith("<"):
+        return name_matches(node["src1"], pat[1:])
+    return name_matches(node["name"], pat)
+
+
+def load_graph(path):
+    nodes = []
+    with open(path) as f:
+        header = next(f).rstrip("\n").split("\t")
+        for line in f:
+            row = dict(zip(header, line.rstrip("\n").split("\t")))
+            row["K"] = int(row["K"])
+            row["nelements"] = int(row["nelements"])
+            nodes.append(row)
+    return nodes
+
+
+def group_costs(nodes):
+    cost = {g: 0 for g, _ in GROUPS}
+    total = 0
+    for n in nodes:
+        if n["op"] in ("NONE", "RESHAPE", "VIEW", "PERMUTE", "TRANSPOSE", "SET_ROWS", "CPY", "CONT"):
+            continue
+        ops = n["K"] * n["nelements"] if n["op"] == "MUL_MAT" else n["nelements"]
+        total += ops
+        for g, sel in GROUPS:
+            if any(op_matches(n, t) for t in sel.split(",")):
+                cost[g] += ops
+                break
+    return {g: c / total for g, c in cost.items()}
+
+
+def pct(x):
+    if x is None:
+        return "-"
+    if x >= 10:
+        return f"{x:.0f}%"
+    if x >= 1:
+        return f"{x:.1f}%"
+    return f"{x:.2f}%"
+
+
+def num(x, d=4):
+    return "-" if x is None else f"{x:.{d}f}"
+
+
+def main():
+    d = sys.argv[1]
+    runs = {r["id"]: r for r in runlib.load_jsonl(os.path.join(d, "runs.jsonl"))}
+    nodes = load_graph(os.path.join(d, "graph.tsv"))
+    cost = group_costs(nodes)
+    present = [g for g, _ in GROUPS if cost[g] > 0]
+    name = os.path.basename(os.path.normpath(d))
+    any_run = next(iter(runs.values()))
+    out = []
+    w = out.append
+
+    w(f"# Op and layer sensitivity: {name}\n")
+    w(f"{any_run['prompts']} prompts, {any_run['positions']} scored positions (every position of every prompt). "
+      f"Reference: plain F32 CPU build, perplexity {any_run['ppl_ref']:.3f} on the prompts. All LNS runs are "
+      "LNSCUDA16 (bit-identical to LNS16 on the CPU). Metrics against the reference, averaged over positions: "
+      "KL(ref || run) in nats, top-1 agreement, relative L2 error of the logits, and perplexity of the prompt "
+      "text under the run.\n")
+
+    w("## 1. Every op in LNS, per summation mode\n")
+    w("| Mode | KL | top-1 agree | logit rel. error | perplexity |")
+    w("|---|---|---|---|---|")
+    for m in MODES:
+        r = runs.get(f"{m}/full")
+        if r:
+            w(f"| {m} | {num(r['kl'])} | {r['top1']*100:.1f}% | {pct(r['logit_rel']*100)} | {r['ppl']:.3f} |")
+    w("")
+
+    w("## 2. Cost share of each op group\n")
+    w("Share of the arithmetic of one forward pass over the first prompt (MUL_MAT: K multiply-adds per output; "
+      "other ops: one per output element).\n")
+    w("| Group | selector | share |")
+    w("|---|---|---|")
+    for g in present:
+        w(f"| {g} | `{SEL[g]}` | {pct(cost[g]*100)} |")
+    w("")
+
+    for part, title, text in (
+        ("isolate", "3. Only one group in LNS (everything else F32)",
+         "Error that each group introduces on its own. `% of full` compares with the all-LNS KL of the same mode."),
+        ("protect", "4. Every group in LNS except one (that one in F32)",
+         "How much of the all-LNS error goes away when one group is kept in F32. `removed` is the drop in KL as a "
+         "share of the all-LNS KL."),
+    ):
+        w(f"## {title}\n")
+        w(text + "\n")
+        hdr = "| Group | " + " | ".join(f"{m} KL | {m} {'% of full' if part == 'isolate' else 'removed'}" for m in MODES) + " |"
+        w(hdr)
+        w("|---|" + "---|---|" * len(MODES))
+        for g in present:
+            cells = []
+            for m in MODES:
+                r, full = runs.get(f"{m}/{part}/{g}"), runs.get(f"{m}/full")
+                if not r or not full:
+                    cells += ["-", "-"]
+                    continue
+                share = r["kl"] / full["kl"] * 100 if part == "isolate" else (full["kl"] - r["kl"]) / full["kl"] * 100
+                cells += [num(r["kl"]), pct(share) if share >= 0 else f"{share:.0f}%"]
+            w(f"| {g} | " + " | ".join(cells) + " |")
+        if part == "isolate":
+            cells = []
+            for m in MODES:
+                full = runs.get(f"{m}/full")
+                s = sum(runs[f"{m}/isolate/{g}"]["kl"] for g in present if f"{m}/isolate/{g}" in runs)
+                cells += [num(s), pct(s / full["kl"] * 100) if full else "-"]
+            w("| **sum of isolated** | " + " | ".join(cells) + " |")
+        w("")
+
+    layers = sorted({r["layer"] for r in runs.values() if r.get("part") == "layer-isolate"})
+    if layers:
+        w("## 5. Per layer\n")
+        w("`only L`: every op of layer L in LNS, the rest F32. `all but L`: every op in LNS except layer L. KL per "
+          "mode.\n")
+        w("| Layer | " + " | ".join(f"{m} only L | {m} all but L" for m in MODES) + " |")
+        w("|---|" + "---|---|" * len(MODES))
+        for L in layers:
+            cells = []
+            for m in MODES:
+                a, b = runs.get(f"{m}/layer-isolate/{L}"), runs.get(f"{m}/layer-protect/{L}")
+                cells += [num(a["kl"]) if a else "-", num(b["kl"]) if b else "-"]
+            w(f"| {L} | " + " | ".join(cells) + " |")
+        w("")
+
+    ups = [g for g in REDUCTION_GROUPS if f"mixed/upgrade/{g}" in runs and cost.get(g, 0) > 0]
+    if ups:
+        base, s32 = runs.get("base/full"), runs.get("sum32/full")
+        w("## 6. Mixed summation: one group's reductions in sum32, the rest base\n")
+        w(f"All-base KL {num(base['kl'])}, all-sum32 KL {num(s32['kl']) if s32 else '-'}. `gap closed` is the share "
+          "of the base to sum32 KL gap this one upgrade closes.\n")
+        w("| Group | share | KL | top-1 | perplexity | gap closed |")
+        w("|---|---|---|---|---|---|")
+        for g in ups:
+            r = runs[f"mixed/upgrade/{g}"]
+            gap = (base["kl"] - r["kl"]) / (base["kl"] - s32["kl"]) * 100 if s32 else None
+            w(f"| {g} | {pct(cost[g]*100)} | {num(r['kl'])} | {r['top1']*100:.1f}% | {r['ppl']:.3f} | {pct(gap) if gap is not None and gap >= 0 else (f'{gap:.0f}%' if gap is not None else '-')} |")
+        w("")
+
+    for kind, title in (("sum32", "7. Greedy mixed policy: base everywhere, groups moved to sum32 one at a time"),
+                        ("f32", "8. Greedy protection: base everywhere, groups moved to F32 one at a time")):
+        steps = sorted((r for r in runs.values() if r.get("part") == "greedy" and r.get("kind") == kind),
+                       key=lambda r: r["step"])
+        if not steps:
+            continue
+        w(f"## {title}\n")
+        w("At each step the group whose change lowers KL the most is added. `share` is the cumulative share of "
+          "the arithmetic that is no longer plain xlns16 base.\n")
+        w("| Step | added | share | KL | top-1 | perplexity |")
+        w("|---|---|---|---|---|---|")
+        b = runs["base/full"]
+        w(f"| 0 | (all base) | 0% | {num(b['kl'])} | {b['top1']*100:.1f}% | {b['ppl']:.3f} |")
+        for r in steps:
+            share = sum(cost.get(g, 0) for g in r["groups"]) * 100
+            w(f"| {r['step']} | {r['added']} | {pct(share)} | {num(r['kl'])} | {r['top1']*100:.1f}% | {r['ppl']:.3f} |")
+        w("")
+
+    print("\n".join(out))
+
+
+if __name__ == "__main__":
+    main()

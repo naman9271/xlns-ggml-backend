@@ -164,7 +164,11 @@ struct xlns16_arith {
 
 #include "lns-cuda-kernels.cuh"
 
-const lns_cuda::kernel_set & lns_cuda::xlns16_kernels() {
+#ifndef LNS_CUDA16_KERNELS_FN
+#define LNS_CUDA16_KERNELS_FN xlns16_kernels
+#endif
+
+const lns_cuda::kernel_set & lns_cuda::LNS_CUDA16_KERNELS_FN() {
     static const detail::kernel_set_impl<xlns16_arith> kernels{};
     return kernels;
 }
