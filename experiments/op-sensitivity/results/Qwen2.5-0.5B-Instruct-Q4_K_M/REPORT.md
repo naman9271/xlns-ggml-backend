@@ -4,6 +4,8 @@
 
 ## 1. Every op in LNS, per summation mode
 
+![KL per summation mode](figures/modes.svg)
+
 | Mode | KL | top-1 agree | logit rel. error | perplexity |
 |---|---|---|---|---|
 | base | 0.4792 | 72.3% | 38% | 9.479 |
@@ -37,6 +39,8 @@ Share of the arithmetic of one forward pass over the first prompt (MUL_MAT: K mu
 
 Error that each group introduces on its own. `% of full` compares with the all-LNS KL of the same mode.
 
+![KL with one group in LNS](figures/isolate.svg)
+
 | Group | base KL | base % of full | monte KL | monte % of full | lpvip KL | lpvip % of full | sum32 KL | sum32 % of full |
 |---|---|---|---|---|---|---|---|---|
 | qkv_proj | 0.0241 | 5.0% | 0.0092 | 3.1% | 0.4094 | 8.2% | 0.0040 | 2.4% |
@@ -60,6 +64,8 @@ Error that each group introduces on its own. `% of full` compares with the all-L
 
 How much of the all-LNS error goes away when one group is kept in F32. `removed` is the drop in KL as a share of the all-LNS KL.
 
+![error removed by one group in F32](figures/protect.svg)
+
 | Group | base KL | base removed | monte KL | monte removed | lpvip KL | lpvip removed | sum32 KL | sum32 removed |
 |---|---|---|---|---|---|---|---|---|
 | qkv_proj | 0.3793 | 21% | 0.3267 | -8% | 5.7349 | -16% | 0.1665 | 0.61% |
@@ -81,6 +87,8 @@ How much of the all-LNS error goes away when one group is kept in F32. `removed`
 ## 5. Per layer
 
 `only L`: every op of layer L in LNS, the rest F32. `all but L`: every op in LNS except layer L. KL per mode.
+
+![KL per layer](figures/layers.svg)
 
 | Layer | base only L | base all but L | monte only L | monte all but L | lpvip only L | lpvip all but L | sum32 only L | sum32 all but L |
 |---|---|---|---|---|---|---|---|---|
@@ -112,6 +120,8 @@ How much of the all-LNS error goes away when one group is kept in F32. `removed`
 ## 6. Mixed summation: one group's reductions in sum32, the rest base
 
 All-base KL 0.4792, all-sum32 KL 0.1675. `gap closed` is the share of the base to sum32 KL gap this one upgrade closes.
+
+![gap closed per group](figures/upgrade.svg)
 
 | Group | share | KL | top-1 | perplexity | gap closed |
 |---|---|---|---|---|---|
@@ -164,4 +174,8 @@ At each step the group whose change lowers KL the most is added. `share` is the 
 | 13 | swiglu | 99% | 0.0031 | 95.0% | 5.881 |
 | 14 | kqv | 100% | 0.0000 | 100.0% | 5.874 |
 | 15 | gather | 100% | 0.0000 | 100.0% | 5.874 |
+
+## 9. Both greedy policies
+
+![greedy policies](figures/greedy.svg)
 

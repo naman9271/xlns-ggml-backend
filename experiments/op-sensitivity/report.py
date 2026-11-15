@@ -7,6 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runlib  # noqa: E402
+import plot  # noqa: E402
 from run import GROUPS, REDUCTION_GROUPS, SEL  # noqa: E402
 
 MODES = ["base", "monte", "lpvip", "sum32"]
@@ -74,6 +75,11 @@ def num(x, d=4):
     return "-" if x is None else f"{x:.{d}f}"
 
 
+def figure(w, made, name, alt):
+    if made:
+        w(f"![{alt}](figures/{name}.svg)\n")
+
+
 def main():
     d = sys.argv[1]
     runs = {r["id"]: r for r in runlib.load_jsonl(os.path.join(d, "runs.jsonl"))}
@@ -84,6 +90,9 @@ def main():
     any_run = next(iter(runs.values()))
     out = []
     w = out.append
+    figs = os.path.join(d, "figures")
+    short = name.split("-Instruct")[0]
+    modes = [m for m in MODES if f"{m}/full" in runs]
 
     w(f"# Op and layer sensitivity: {name}\n")
     w(f"{any_run['prompts']} prompts, {any_run['positions']} scored positions (every position of every prompt). "
@@ -93,6 +102,10 @@ def main():
       "text under the run.\n")
 
     w("## 1. Every op in LNS, per summation mode\n")
+    figure(w, plot.bar_chart(
+        os.path.join(figs, "modes.svg"), f"{short}: every op in LNS", "KL divergence from the F32 reference (nats, log scale)",
+        ["all ops in LNS"], [(m, plot.slot(m, i), [runs[f"{m}/full"]["kl"]]) for i, m in enumerate(modes)],
+        "KL (nats)", xlog=True, labels=True), "modes", "KL per summation mode")
     w("| Mode | KL | top-1 agree | logit rel. error | perplexity |")
     w("|---|---|---|---|---|")
     for m in MODES:
@@ -119,6 +132,19 @@ def main():
     ):
         w(f"## {title}\n")
         w(text + "\n")
+        if part == "isolate":
+            figure(w, plot.bar_chart(
+                os.path.join(figs, "isolate.svg"), f"{short}: one op group in LNS, the rest F32",
+                "KL from the F32 reference caused by that group alone (nats, log scale)", present,
+                [(m, plot.slot(m, i), [runs.get(f"{m}/isolate/{g}", {}).get("kl") for g in present])
+                 for i, m in enumerate(modes)], "KL (nats)", xlog=True), "isolate", "KL with one group in LNS")
+        else:
+            figure(w, plot.bar_chart(
+                os.path.join(figs, "protect.svg"), f"{short}: one op group kept in F32, the rest LNS",
+                "share of the all-LNS KL that disappears; negative = keeping it in F32 makes things worse", present,
+                [(m, plot.slot(m, i), [(runs[f"{m}/full"]["kl"] - runs[f"{m}/protect/{g}"]["kl"]) / runs[f"{m}/full"]["kl"] * 100
+                                       if f"{m}/protect/{g}" in runs else None for g in present])
+                 for i, m in enumerate(modes)], "error removed (%)"), "protect", "error removed by one group in F32")
         hdr = "| Group | " + " | ".join(f"{m} KL | {m} {'% of full' if part == 'isolate' else 'removed'}" for m in MODES) + " |"
         w(hdr)
         w("|---|" + "---|---|" * len(MODES))
@@ -146,6 +172,11 @@ def main():
         w("## 5. Per layer\n")
         w("`only L`: every op of layer L in LNS, the rest F32. `all but L`: every op in LNS except layer L. KL per "
           "mode.\n")
+        figure(w, plot.line_chart(
+            os.path.join(figs, "layers.svg"), f"{short}: one layer in LNS, the rest F32",
+            "KL from the F32 reference caused by each layer alone (nats, log scale)",
+            [(m, plot.slot(m, i), [(L, runs[f"{m}/layer-isolate/{L}"]["kl"]) for L in layers if f"{m}/layer-isolate/{L}" in runs])
+             for i, m in enumerate(modes)], "layer", "KL (nats)", ylog=True), "layers", "KL per layer")
         w("| Layer | " + " | ".join(f"{m} only L | {m} all but L" for m in MODES) + " |")
         w("|---|" + "---|---|" * len(MODES))
         for L in layers:
@@ -162,6 +193,11 @@ def main():
         w("## 6. Mixed summation: one group's reductions in sum32, the rest base\n")
         w(f"All-base KL {num(base['kl'])}, all-sum32 KL {num(s32['kl']) if s32 else '-'}. `gap closed` is the share "
           "of the base to sum32 KL gap this one upgrade closes.\n")
+        figure(w, plot.bar_chart(
+            os.path.join(figs, "upgrade.svg"), f"{short}: one group's sums in sum32, the rest base",
+            "share of the base to all-sum32 KL gap closed by upgrading only that group", ups,
+            [("sum32", plot.slot("sum32", 3), [(base["kl"] - runs[f"mixed/upgrade/{g}"]["kl"]) / (base["kl"] - s32["kl"]) * 100
+                                               for g in ups])], "gap closed (%)"), "upgrade", "gap closed per group")
         w("| Group | share | KL | top-1 | perplexity | gap closed |")
         w("|---|---|---|---|---|---|")
         for g in ups:
@@ -187,6 +223,19 @@ def main():
             share = sum(cost.get(g, 0) for g in r["groups"]) * 100
             w(f"| {r['step']} | {r['added']} | {pct(share)} | {num(r['kl'])} | {r['top1']*100:.1f}% | {r['ppl']:.3f} |")
         w("")
+
+    gser = []
+    for kind, label, sl in (("sum32", "groups moved to sum32", 3), ("f32", "groups moved to F32", 6)):
+        steps = sorted((r for r in runs.values() if r.get("part") == "greedy" and r.get("kind") == kind), key=lambda r: r["step"])
+        if steps and "base/full" in runs:
+            pts = [(0.0, runs["base/full"]["kl"])] + [(sum(cost.get(g, 0) for g in r["groups"]) * 100, r["kl"]) for r in steps]
+            gser.append((label, sl, pts))
+    if gser:
+        w("## 9. Both greedy policies\n")
+        figure(w, plot.line_chart(
+            os.path.join(figs, "greedy.svg"), f"{short}: greedy policies, starting from all base",
+            "KL after each step against the share of the arithmetic no longer in xlns16 base (KL 0 is not drawn)",
+            gser, "share of the arithmetic upgraded (%)", "KL (nats)", ylog=True), "greedy", "greedy policies")
 
     print("\n".join(out))
 

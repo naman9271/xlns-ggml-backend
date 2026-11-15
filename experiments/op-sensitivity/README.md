@@ -16,7 +16,7 @@ is measured on the model's output distribution.
 | `logit-probe.cpp` | Runs a prompt set through a model (every position scored). It saves the F32 reference logits, or compares against them: KL(ref ‖ run), top-1 agreement, relative logit error, perplexity of the prompt text. `--graph` writes the node inventory (name, op, K, size) used for the cost shares. |
 | `prompts.txt` | 7 passages (facts, arithmetic, science, story, Q&A), 447 scored positions in total. |
 | `run.py` | The queue: one probe process at a time, results appended to `results/<model>/runs.jsonl`, so a rerun resumes. |
-| `report.py` | `results/<model>/runs.jsonl` + `graph.tsv` → `results/<model>/REPORT.md`. |
+| `report.py` | `results/<model>/runs.jsonl` + `graph.tsv` → `results/<model>/REPORT.md`, with its figures as SVG in `results/<model>/figures/` (drawn by `experiments/plot.py`, plain Python, no extra packages). |
 
 ## Backend knobs used
 

@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 848" width="760" height="848" role="img">
+<title>SmolLM2-135M: one op group kept in F32, the rest LNS</title><desc>share of the all-LNS KL that disappears; negative = keeping it in F32 makes things worse</desc>
+<style>svg{--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--s0:#2a78d6;--s1:#eb6834;--s2:#1baf7a;--s3:#eda100;--s4:#e87ba4;--s5:#008300;--s6:#6250d6;--s7:#e34948}@media (prefers-color-scheme: dark){svg{--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--s0:#3987e5;--s1:#d95926;--s2:#199e70;--s3:#c98500;--s4:#d55181;--s5:#0ca30c;--s6:#9085e9;--s7:#e66767}}text{font-family:system-ui, -apple-system, "Segoe UI", sans-serif;fill:var(--ink2);font-size:12px}.title{fill:var(--ink);font-size:15px;font-weight:600}.sub{fill:var(--ink2);font-size:12px}.tick{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}.lab{fill:var(--ink2);font-size:12px}.grid{stroke:var(--grid);stroke-width:1}.axis{stroke:var(--axis);stroke-width:1}.ref{stroke:var(--muted);stroke-width:1}.l0{stroke:var(--s0);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f0{fill:var(--s0)}.l1{stroke:var(--s1);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f1{fill:var(--s1)}.l2{stroke:var(--s2);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f2{fill:var(--s2)}.l3{stroke:var(--s3);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f3{fill:var(--s3)}.l4{stroke:var(--s4);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f4{fill:var(--s4)}.l5{stroke:var(--s5);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f5{fill:var(--s5)}.l6{stroke:var(--s6);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f6{fill:var(--s6)}.l7{stroke:var(--s7);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f7{fill:var(--s7)}</style>
+<rect width="760" height="848" rx="8" style="fill:var(--surface)"/>
+<text class="title" x="76" y="28">SmolLM2-135M: one op group kept in F32, the rest LNS</text>
+<text class="sub" x="76" y="48">share of the all-LNS KL that disappears; negative = keeping it in F32 makes things worse</text>
+<rect class="f0" x="76" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="94" y="72">base</text>
+<rect class="f1" x="147" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="165" y="72">monte</text>
+<rect class="f2" x="225" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="243" y="72">lpvip</text>
+<rect class="f3" x="303" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="321" y="72">sum32</text>
+<line class="grid" x1="212.7" y1="92" x2="212.7" y2="792"/>
+<text class="tick" x="212.7" y="810" text-anchor="middle">0</text>
+<line class="grid" x1="324.7" y1="92" x2="324.7" y2="792"/>
+<text class="tick" x="324.7" y="810" text-anchor="middle">20</text>
+<line class="grid" x1="436.8" y1="92" x2="436.8" y2="792"/>
+<text class="tick" x="436.8" y="810" text-anchor="middle">40</text>
+<line class="grid" x1="548.9" y1="92" x2="548.9" y2="792"/>
+<text class="tick" x="548.9" y="810" text-anchor="middle">60</text>
+<line class="grid" x1="660.9" y1="92" x2="660.9" y2="792"/>
+<text class="tick" x="660.9" y="810" text-anchor="middle">80</text>
+<text class="lab" x="441.0" y="836" text-anchor="middle">error removed (%)</text>
+<text class="lab" x="138" y="121.0" text-anchor="end">qkv_proj</text>
+<path class="f0" d="M212.7,96.0 H229.4 Q233.4,96.0 233.4,100.0 V100.5 Q233.4,104.5 229.4,104.5 H212.7 Z"/>
+<path class="f1" d="M212.7,106.5 H266.3 Q270.3,106.5 270.3,110.5 V111.0 Q270.3,115.0 266.3,115.0 H212.7 Z"/>
+<path class="f2" d="M212.7,117.0 H279.9 Q283.9,117.0 283.9,121.0 V121.5 Q283.9,125.5 279.9,125.5 H212.7 Z"/>
+<path class="f3" d="M212.7,127.5 H243.2 Q247.2,127.5 247.2,131.5 V132.0 Q247.2,136.0 243.2,136.0 H212.7 Z"/>
+<text class="lab" x="138" y="171.0" text-anchor="end">rope</text>
+<path class="f0" d="M212.7,146.0 H220.3 Q224.3,146.0 224.3,150.0 V150.5 Q224.3,154.5 220.3,154.5 H212.7 Z"/>
+<path class="f1" d="M212.7,156.5 H238.8 Q242.8,156.5 242.8,160.5 V161.0 Q242.8,165.0 238.8,165.0 H212.7 Z"/>
+<path class="f2" d="M212.7,167.0 H214.2 Q218.2,167.0 218.2,171.0 V171.5 Q218.2,175.5 214.2,175.5 H212.7 Z"/>
+<path class="f3" d="M212.7,177.5 H212.7 Q210.2,177.5 210.2,179.9 V183.6 Q210.2,186.0 212.7,186.0 H212.7 Z"/>
+<text class="lab" x="138" y="221.0" text-anchor="end">kq</text>
+<path class="f0" d="M212.7,196.0 H222.6 Q226.6,196.0 226.6,200.0 V200.5 Q226.6,204.5 222.6,204.5 H212.7 Z"/>
+<path class="f1" d="M212.7,206.5 H237.1 Q241.1,206.5 241.1,210.5 V211.0 Q241.1,215.0 237.1,215.0 H212.7 Z"/>
+<path class="f2" d="M212.7,217.0 H214.6 Q218.6,217.0 218.6,221.0 V221.5 Q218.6,225.5 214.6,225.5 H212.7 Z"/>
+<path class="f3" d="M212.7,227.5 H212.7 Q213.2,227.5 213.2,228.0 V235.5 Q213.2,236.0 212.7,236.0 H212.7 Z"/>
+<text class="lab" x="138" y="271.0" text-anchor="end">softmax</text>
+<path class="f0" d="M212.7,246.0 H209.1 Q205.1,246.0 205.1,250.0 V250.5 Q205.1,254.5 209.1,254.5 H212.7 Z"/>
+<path class="f1" d="M212.7,256.5 H230.6 Q234.6,256.5 234.6,260.5 V261.0 Q234.6,265.0 230.6,265.0 H212.7 Z"/>
+<path class="f2" d="M212.7,267.0 H212.7 Q213.3,267.0 213.3,267.6 V274.9 Q213.3,275.5 212.7,275.5 H212.7 Z"/>
+<path class="f3" d="M212.7,277.5 H214.3 Q218.3,277.5 218.3,281.5 V282.0 Q218.3,286.0 214.3,286.0 H212.7 Z"/>
+<text class="lab" x="138" y="321.0" text-anchor="end">kqv</text>
+<path class="f0" d="M212.7,296.0 H212.7 Q210.5,296.0 210.5,298.1 V302.4 Q210.5,304.5 212.7,304.5 H212.7 Z"/>
+<path class="f1" d="M212.7,306.5 H213.3 Q217.3,306.5 217.3,310.5 V311.0 Q217.3,315.0 213.3,315.0 H212.7 Z"/>
+<path class="f2" d="M212.7,317.0 H212.7 Q215.2,317.0 215.2,319.5 V323.0 Q215.2,325.5 212.7,325.5 H212.7 Z"/>
+<path class="f3" d="M212.7,327.5 H216.2 Q220.2,327.5 220.2,331.5 V332.0 Q220.2,336.0 216.2,336.0 H212.7 Z"/>
+<text class="lab" x="138" y="371.0" text-anchor="end">attn_out</text>
+<path class="f0" d="M212.7,346.0 H241.3 Q245.3,346.0 245.3,350.0 V350.5 Q245.3,354.5 241.3,354.5 H212.7 Z"/>
+<path class="f1" d="M212.7,356.5 H247.1 Q251.1,356.5 251.1,360.5 V361.0 Q251.1,365.0 247.1,365.0 H212.7 Z"/>
+<path class="f2" d="M212.7,367.0 H193.7 Q189.7,367.0 189.7,371.0 V371.5 Q189.7,375.5 193.7,375.5 H212.7 Z"/>
+<path class="f3" d="M212.7,377.5 H222.4 Q226.4,377.5 226.4,381.5 V382.0 Q226.4,386.0 222.4,386.0 H212.7 Z"/>
+<text class="lab" x="138" y="421.0" text-anchor="end">ffn_gate_up</text>
+<path class="f0" d="M212.7,396.0 H208.9 Q204.9,396.0 204.9,400.0 V400.5 Q204.9,404.5 208.9,404.5 H212.7 Z"/>
+<path class="f1" d="M212.7,406.5 H212.7 Q212.2,406.5 212.2,407.0 V414.5 Q212.2,415.0 212.7,415.0 H212.7 Z"/>
+<path class="f2" d="M212.7,417.0 H403.6 Q407.6,417.0 407.6,421.0 V421.5 Q407.6,425.5 403.6,425.5 H212.7 Z"/>
+<path class="f3" d="M212.7,427.5 H201.7 Q197.7,427.5 197.7,431.5 V432.0 Q197.7,436.0 201.7,436.0 H212.7 Z"/>
+<text class="lab" x="138" y="471.0" text-anchor="end">swiglu</text>
+<path class="f0" d="M212.7,446.0 H182.0 Q178.0,446.0 178.0,450.0 V450.5 Q178.0,454.5 182.0,454.5 H212.7 Z"/>
+<path class="f1" d="M212.7,456.5 H236.3 Q240.3,456.5 240.3,460.5 V461.0 Q240.3,465.0 236.3,465.0 H212.7 Z"/>
+<path class="f2" d="M212.7,467.0 H215.6 Q219.6,467.0 219.6,471.0 V471.5 Q219.6,475.5 215.6,475.5 H212.7 Z"/>
+<path class="f3" d="M212.7,477.5 H185.3 Q181.3,477.5 181.3,481.5 V482.0 Q181.3,486.0 185.3,486.0 H212.7 Z"/>
+<text class="lab" x="138" y="521.0" text-anchor="end">ffn_down</text>
+<path class="f0" d="M212.7,496.0 H246.9 Q250.9,496.0 250.9,500.0 V500.5 Q250.9,504.5 246.9,504.5 H212.7 Z"/>
+<path class="f1" d="M212.7,506.5 H276.9 Q280.9,506.5 280.9,510.5 V511.0 Q280.9,515.0 276.9,515.0 H212.7 Z"/>
+<path class="f2" d="M212.7,517.0 H539.4 Q543.4,517.0 543.4,521.0 V521.5 Q543.4,525.5 539.4,525.5 H212.7 Z"/>
+<path class="f3" d="M212.7,527.5 H196.0 Q192.0,527.5 192.0,531.5 V532.0 Q192.0,536.0 196.0,536.0 H212.7 Z"/>
+<text class="lab" x="138" y="571.0" text-anchor="end">rms_norm</text>
+<path class="f0" d="M212.7,546.0 H455.6 Q459.6,546.0 459.6,550.0 V550.5 Q459.6,554.5 455.6,554.5 H212.7 Z"/>
+<path class="f1" d="M212.7,556.5 H264.8 Q268.8,556.5 268.8,560.5 V561.0 Q268.8,565.0 264.8,565.0 H212.7 Z"/>
+<path class="f2" d="M212.7,567.0 H211.1 Q207.1,567.0 207.1,571.0 V571.5 Q207.1,575.5 211.1,575.5 H212.7 Z"/>
+<path class="f3" d="M212.7,577.5 H187.9 Q183.9,577.5 183.9,581.5 V582.0 Q183.9,586.0 187.9,586.0 H212.7 Z"/>
+<text class="lab" x="138" y="621.0" text-anchor="end">norm_scale</text>
+<path class="f0" d="M212.7,596.0 H212.7 Q208.9,596.0 208.9,599.7 V600.8 Q208.9,604.5 212.7,604.5 H212.7 Z"/>
+<path class="f1" d="M212.7,606.5 H222.3 Q226.3,606.5 226.3,610.5 V611.0 Q226.3,615.0 222.3,615.0 H212.7 Z"/>
+<path class="f2" d="M212.7,617.0 H212.7 Q213.8,617.0 213.8,618.1 V624.4 Q213.8,625.5 212.7,625.5 H212.7 Z"/>
+<path class="f3" d="M212.7,627.5 H212.7 Q211.5,627.5 211.5,628.6 V634.9 Q211.5,636.0 212.7,636.0 H212.7 Z"/>
+<text class="lab" x="138" y="671.0" text-anchor="end">residual</text>
+<path class="f0" d="M212.7,646.0 H439.6 Q443.6,646.0 443.6,650.0 V650.5 Q443.6,654.5 439.6,654.5 H212.7 Z"/>
+<path class="f1" d="M212.7,656.5 H348.4 Q352.4,656.5 352.4,660.5 V661.0 Q352.4,665.0 348.4,665.0 H212.7 Z"/>
+<path class="f2" d="M212.7,667.0 H176.5 Q172.5,667.0 172.5,671.0 V671.5 Q172.5,675.5 176.5,675.5 H212.7 Z"/>
+<path class="f3" d="M212.7,677.5 H697.5 Q701.5,677.5 701.5,681.5 V682.0 Q701.5,686.0 697.5,686.0 H212.7 Z"/>
+<text class="lab" x="138" y="721.0" text-anchor="end">lm_head</text>
+<path class="f0" d="M212.7,696.0 H351.5 Q355.5,696.0 355.5,700.0 V700.5 Q355.5,704.5 351.5,704.5 H212.7 Z"/>
+<path class="f1" d="M212.7,706.5 H520.1 Q524.1,706.5 524.1,710.5 V711.0 Q524.1,715.0 520.1,715.0 H212.7 Z"/>
+<path class="f2" d="M212.7,717.0 H192.4 Q188.4,717.0 188.4,721.0 V721.5 Q188.4,725.5 192.4,725.5 H212.7 Z"/>
+<path class="f3" d="M212.7,727.5 H212.7 Q210.7,727.5 210.7,729.4 V734.1 Q210.7,736.0 212.7,736.0 H212.7 Z"/>
+<text class="lab" x="138" y="771.0" text-anchor="end">gather</text>
+<path class="f0" d="M212.7,746.0 H212.2 Q212.7,746.0 212.7,746.5 V754.0 Q212.7,754.5 212.2,754.5 H212.7 Z"/>
+<path class="f1" d="M212.7,756.5 H212.2 Q212.7,756.5 212.7,757.0 V764.5 Q212.7,765.0 212.2,765.0 H212.7 Z"/>
+<path class="f2" d="M212.7,767.0 H212.2 Q212.7,767.0 212.7,767.5 V775.0 Q212.7,775.5 212.2,775.5 H212.7 Z"/>
+<path class="f3" d="M212.7,777.5 H212.2 Q212.7,777.5 212.7,778.0 V785.5 Q212.7,786.0 212.2,786.0 H212.7 Z"/>
+<line class="axis" x1="212.7" y1="92" x2="212.7" y2="792"/>
+</svg>

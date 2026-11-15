@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" role="img">
+<title>Qwen2.5-0.5B: one layer in LNS, the rest F32</title><desc>KL from the F32 reference caused by each layer alone (nats, log scale)</desc>
+<style>svg{--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--s0:#2a78d6;--s1:#eb6834;--s2:#1baf7a;--s3:#eda100;--s4:#e87ba4;--s5:#008300;--s6:#6250d6;--s7:#e34948}@media (prefers-color-scheme: dark){svg{--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--s0:#3987e5;--s1:#d95926;--s2:#199e70;--s3:#c98500;--s4:#d55181;--s5:#0ca30c;--s6:#9085e9;--s7:#e66767}}text{font-family:system-ui, -apple-system, "Segoe UI", sans-serif;fill:var(--ink2);font-size:12px}.title{fill:var(--ink);font-size:15px;font-weight:600}.sub{fill:var(--ink2);font-size:12px}.tick{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}.lab{fill:var(--ink2);font-size:12px}.grid{stroke:var(--grid);stroke-width:1}.axis{stroke:var(--axis);stroke-width:1}.ref{stroke:var(--muted);stroke-width:1}.l0{stroke:var(--s0);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f0{fill:var(--s0)}.l1{stroke:var(--s1);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f1{fill:var(--s1)}.l2{stroke:var(--s2);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f2{fill:var(--s2)}.l3{stroke:var(--s3);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f3{fill:var(--s3)}.l4{stroke:var(--s4);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f4{fill:var(--s4)}.l5{stroke:var(--s5);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f5{fill:var(--s5)}.l6{stroke:var(--s6);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f6{fill:var(--s6)}.l7{stroke:var(--s7);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f7{fill:var(--s7)}</style>
+<rect width="760" height="440" rx="8" style="fill:var(--surface)"/>
+<text class="title" x="76" y="28">Qwen2.5-0.5B: one layer in LNS, the rest F32</text>
+<text class="sub" x="76" y="48">KL from the F32 reference caused by each layer alone (nats, log scale)</text>
+<line class="l0" x1="76" y1="68" x2="94" y2="68"/>
+<circle class="f0" cx="85" cy="68" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<text class="lab" x="100" y="72">base</text>
+<line class="l1" x1="153" y1="68" x2="171" y2="68"/>
+<circle class="f1" cx="162" cy="68" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<text class="lab" x="177" y="72">monte</text>
+<line class="l2" x1="237" y1="68" x2="255" y2="68"/>
+<circle class="f2" cx="246" cy="68" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<text class="lab" x="261" y="72">lpvip</text>
+<line class="l3" x1="321" y1="68" x2="339" y2="68"/>
+<circle class="f3" cx="330" cy="68" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<text class="lab" x="345" y="72">sum32</text>
+<line class="grid" x1="76" y1="384.0" x2="736" y2="384.0"/>
+<text class="tick" x="68" y="388.0" text-anchor="end">1e-3</text>
+<line class="grid" x1="76" y1="311.0" x2="736" y2="311.0"/>
+<text class="tick" x="68" y="315.0" text-anchor="end">0.01</text>
+<line class="grid" x1="76" y1="238.0" x2="736" y2="238.0"/>
+<text class="tick" x="68" y="242.0" text-anchor="end">0.1</text>
+<line class="grid" x1="76" y1="165.0" x2="736" y2="165.0"/>
+<text class="tick" x="68" y="169.0" text-anchor="end">1</text>
+<line class="grid" x1="76" y1="92.0" x2="736" y2="92.0"/>
+<text class="tick" x="68" y="96.0" text-anchor="end">10</text>
+<line class="axis" x1="84.0" y1="384" x2="84.0" y2="388"/>
+<text class="tick" x="84.0" y="402" text-anchor="middle">0</text>
+<line class="axis" x1="224.0" y1="384" x2="224.0" y2="388"/>
+<text class="tick" x="224.0" y="402" text-anchor="middle">5</text>
+<line class="axis" x1="364.0" y1="384" x2="364.0" y2="388"/>
+<text class="tick" x="364.0" y="402" text-anchor="middle">10</text>
+<line class="axis" x1="504.0" y1="384" x2="504.0" y2="388"/>
+<text class="tick" x="504.0" y="402" text-anchor="middle">15</text>
+<line class="axis" x1="644.0" y1="384" x2="644.0" y2="388"/>
+<text class="tick" x="644.0" y="402" text-anchor="middle">20</text>
+<line class="axis" x1="76" y1="384" x2="736" y2="384"/>
+<text class="lab" x="406.0" y="428" text-anchor="middle">layer</text>
+<text class="lab" transform="translate(16,238.0) rotate(-90)" text-anchor="middle">KL (nats)</text>
+<polyline class="l0" points="84.0,303.4 112.0,303.1 140.0,302.1 168.0,213.7 196.0,294.1 224.0,294.9 252.0,295.6 280.0,301.9 308.0,305.1 336.0,306.3 364.0,308.4 392.0,308.1 420.0,311.0 448.0,314.5 476.0,306.9 504.0,310.5 532.0,312.3 560.0,314.4 588.0,316.1 616.0,318.6 644.0,314.4 672.0,234.1 700.0,320.0 728.0,255.8"/>
+<circle class="f0" cx="84.0" cy="303.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="112.0" cy="303.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="140.0" cy="302.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="168.0" cy="213.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="196.0" cy="294.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="224.0" cy="294.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="252.0" cy="295.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="280.0" cy="301.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="308.0" cy="305.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="336.0" cy="306.3" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="364.0" cy="308.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="392.0" cy="308.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="420.0" cy="311.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="448.0" cy="314.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="476.0" cy="306.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="504.0" cy="310.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="532.0" cy="312.3" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="560.0" cy="314.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="588.0" cy="316.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="616.0" cy="318.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="644.0" cy="314.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="672.0" cy="234.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="700.0" cy="320.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f0" cx="728.0" cy="255.8" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<polyline class="l1" points="84.0,305.0 112.0,322.7 140.0,320.6 168.0,273.3 196.0,323.0 224.0,320.6 252.0,323.7 280.0,326.0 308.0,326.6 336.0,334.8 364.0,332.8 392.0,337.9 420.0,338.1 448.0,337.8 476.0,331.2 504.0,333.7 532.0,333.3 560.0,336.8 588.0,338.6 616.0,339.6 644.0,332.2 672.0,278.5 700.0,339.0 728.0,304.9"/>
+<circle class="f1" cx="84.0" cy="305.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="112.0" cy="322.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="140.0" cy="320.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="168.0" cy="273.3" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="196.0" cy="323.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="224.0" cy="320.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="252.0" cy="323.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="280.0" cy="326.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="308.0" cy="326.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="336.0" cy="334.8" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="364.0" cy="332.8" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="392.0" cy="337.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="420.0" cy="338.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="448.0" cy="337.8" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="476.0" cy="331.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="504.0" cy="333.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="532.0" cy="333.3" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="560.0" cy="336.8" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="588.0" cy="338.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="616.0" cy="339.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="644.0" cy="332.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="672.0" cy="278.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="700.0" cy="339.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f1" cx="728.0" cy="304.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<polyline class="l2" points="84.0,157.4 112.0,221.2 140.0,216.0 168.0,218.4 196.0,232.6 224.0,224.7 252.0,226.0 280.0,229.9 308.0,238.2 336.0,250.8 364.0,243.7 392.0,252.7 420.0,255.3 448.0,253.2 476.0,239.3 504.0,238.5 532.0,238.9 560.0,244.0 588.0,240.9 616.0,231.5 644.0,227.7 672.0,230.3 700.0,229.0 728.0,187.5"/>
+<circle class="f2" cx="84.0" cy="157.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="112.0" cy="221.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="140.0" cy="216.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="168.0" cy="218.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="196.0" cy="232.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="224.0" cy="224.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="252.0" cy="226.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="280.0" cy="229.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="308.0" cy="238.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="336.0" cy="250.8" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="364.0" cy="243.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="392.0" cy="252.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="420.0" cy="255.3" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="448.0" cy="253.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="476.0" cy="239.3" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="504.0" cy="238.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="532.0" cy="238.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="560.0" cy="244.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="588.0" cy="240.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="616.0" cy="231.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="644.0" cy="227.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="672.0" cy="230.3" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="700.0" cy="229.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f2" cx="728.0" cy="187.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<polyline class="l3" points="84.0,337.9 112.0,342.8 140.0,344.1 168.0,299.9 196.0,333.4 224.0,336.0 252.0,338.1 280.0,340.1 308.0,341.7 336.0,346.9 364.0,343.6 392.0,348.9 420.0,347.9 448.0,347.1 476.0,346.4 504.0,343.5 532.0,348.0 560.0,347.0 588.0,349.2 616.0,356.5 644.0,341.0 672.0,302.8 700.0,371.2 728.0,360.6"/>
+<circle class="f3" cx="84.0" cy="337.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="112.0" cy="342.8" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="140.0" cy="344.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="168.0" cy="299.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="196.0" cy="333.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="224.0" cy="336.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="252.0" cy="338.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="280.0" cy="340.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="308.0" cy="341.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="336.0" cy="346.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="364.0" cy="343.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="392.0" cy="348.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="420.0" cy="347.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="448.0" cy="347.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="476.0" cy="346.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="504.0" cy="343.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="532.0" cy="348.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="560.0" cy="347.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="588.0" cy="349.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="616.0" cy="356.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="644.0" cy="341.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="672.0" cy="302.8" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="700.0" cy="371.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="728.0" cy="360.6" r="4" style="stroke:var(--surface);stroke-width:2"/>
+</svg>
