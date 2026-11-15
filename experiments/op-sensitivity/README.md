@@ -75,7 +75,7 @@ With the base mode as the cheap default:
 ## How to run
 
 `run.sh` does everything:
-- builds the trees (`setup.sh --cuda --skip-inference`);
+- builds the trees (`setup.sh --cuda`, which also runs its short inference checks);
 - reconfigures `build-lns-base` with `-DGGML_LNSCUDA16_MIXED=ON`;
 - downloads the two Q4_K_M models if they are missing;
 - runs the queue and writes `results/<model>/REPORT.md`.

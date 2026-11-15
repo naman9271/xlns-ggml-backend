@@ -56,8 +56,10 @@ setup_build() {
         echo "==> SKIP_SETUP=1: using the existing build trees"
         return 0
     fi
-    echo "==> building every LNS tree: setup.sh --cuda --skip-inference (JOBS=$JOBS)"
-    lib_run bash -c 'cd "$1" && ./setup.sh --cuda --skip-inference' _ "$REPO_ROOT"
+    download "$URL_SMOLLM" "$MODEL_SMOLLM"
+    echo "==> building every LNS tree and checking it with short runs: setup.sh --cuda (JOBS=$JOBS)"
+    lib_run env MODEL_SMOLLM="$MODEL_SMOLLM" LNS32_INFERENCE="${LNS32_INFERENCE:-0}" \
+        bash -c 'cd "$1" && ./setup.sh --cuda' _ "$REPO_ROOT"
 }
 
 download() {
