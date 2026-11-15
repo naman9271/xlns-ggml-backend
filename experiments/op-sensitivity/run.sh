@@ -19,4 +19,5 @@ for d in "$HERE"/results/*/; do
         write_report "$HERE/report.py" "$d" "$d/REPORT.md"
     fi
 done
+write_report "$HERE/report.py" --summary "$HERE/results" "$HERE/results/SUMMARY.md"
 finish_work "$REPO_ROOT/build/exp-op"

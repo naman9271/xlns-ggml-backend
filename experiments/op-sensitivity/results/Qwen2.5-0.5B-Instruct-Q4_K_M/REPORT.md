@@ -13,7 +13,24 @@
 | lpvip | 4.9623 | 12.2% | 87% | 856.954 |
 | sum32 | 0.1675 | 89.7% | 18% | 6.531 |
 
+## Key configurations
+
+![key configurations](figures/policies.svg)
+
+| configuration | KL | top-1 agree | perplexity |
+|---|---|---|---|
+| all base | 0.4792 | 72.3% | 9.479 |
+| all monte | 0.3019 | 76.0% | 7.423 |
+| all sum32 | 0.1675 | 89.7% | 6.531 |
+| base, rms_norm in sum32 | 0.2858 | 77.3% | 6.987 |
+| base, rms_norm + residual in F32 | 0.1775 | 80.3% | 6.728 |
+| monte, residual in F32 | 0.1709 | 75.5% | 6.951 |
+| sum32, residual in F32 | 0.0105 | 93.4% | 5.847 |
+| best greedy sum32 mix (rms_norm, ffn_down, lm_head, qkv_proj, kq) | 0.1482 | 87.6% | 6.417 |
+
 ## 2. Cost share of each op group
+
+![cost against damage](figures/cost-damage.svg)
 
 Share of the arithmetic of one forward pass over the first prompt (MUL_MAT: K multiply-adds per output; other ops: one per output element).
 
@@ -89,6 +106,8 @@ How much of the all-LNS error goes away when one group is kept in F32. `removed`
 `only L`: every op of layer L in LNS, the rest F32. `all but L`: every op in LNS except layer L. KL per mode.
 
 ![KL per layer](figures/layers.svg)
+
+![error removed per layer](figures/layers-protect.svg)
 
 | Layer | base only L | base all but L | monte only L | monte all but L | lpvip only L | lpvip all but L | sum32 only L | sum32 all but L |
 |---|---|---|---|---|---|---|---|---|

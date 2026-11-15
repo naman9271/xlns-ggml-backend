@@ -191,7 +191,7 @@ def bar_chart(path, title, subtitle, categories, series, xlabel, xlog=False, ref
     else:
         pad = (hi - lo) * 0.05 or 1
         lo, hi = (lo - pad if lo < 0 else 0), hi + pad
-    left = ML + 70
+    left = max(ML + 70, int(20 + 6.6 * max(len(c) for c in categories)))
     h = max(H, MT + MB + len(categories) * (len(series) * 9 + 14))
     xa = Axis(lo, hi, xlog, left, W - MR - 8)
     out = _frame(title, subtitle, [(n, f"f{s}", "rect") for n, s, _ in series], h)
@@ -227,6 +227,40 @@ def bar_chart(path, title, subtitle, categories, series, xlabel, xlog=False, ref
     for name, v in ref or []:
         x = xa(v)
         out.append(f'<line class="ref" x1="{x:.1f}" y1="{MT}" x2="{x:.1f}" y2="{h - MB}"/>')
-        out.append(f'<text class="tick" x="{x + 4:.1f}" y="{MT + 10}">{escape(name)}</text>')
+        out.append(f'<text class="tick" x="{x + 4:.1f}" y="{MT - 6}">{escape(name)}</text>')
+    _write(path, out)
+    return True
+
+
+def scatter(path, title, subtitle, series, xlabel, ylabel, xlog=False, ylog=False, label_top=6):
+    pts = [(x, y) for _, _, p in series for x, y, _ in p if (not xlog or x > 0) and (not ylog or y > 0)]
+    if not pts:
+        return False
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    xlo, xhi, ylo, yhi = min(xs), max(xs), min(ys), max(ys)
+    if xlog:
+        xlo, xhi = 10 ** math.floor(math.log10(xlo)), 10 ** math.ceil(math.log10(xhi))
+    if ylog:
+        ylo, yhi = 10 ** math.floor(math.log10(ylo)), 10 ** math.ceil(math.log10(yhi))
+    mr = MR + 60
+    xa = Axis(xlo, xhi, xlog, ML + 8, W - mr - 8)
+    ya = Axis(ylo, yhi, ylog, H - MB, MT)
+    out = _frame(title, subtitle, [(n, f"l{s}", "line") for n, s, _ in series])
+    _axes(out, xa, ya, xlabel, ylabel, mr=mr)
+    for _, s, p in series:
+        p = [(x, y, t) for x, y, t in p if (not xlog or x > 0) and (not ylog or y > 0)]
+        top = sorted(p, key=lambda q: -q[1])[:label_top]
+        for x, y, t in p:
+            out.append(f'<circle class="f{s}" cx="{xa(x):.1f}" cy="{ya(y):.1f}" r="5" style="stroke:var(--surface);stroke-width:2"/>')
+        boxes = [(xa(x) - 6, ya(y) - 6, xa(x) + 6, ya(y) + 6) for x, y, _ in p]
+        for x, y, t in top:
+            cx, cy, tw = xa(x), ya(y), 6.6 * len(t)
+            for lx, ly, anchor in ((cx + 9, cy + 4, "start"), (cx - 9, cy + 4, "end"), (cx, cy - 10, "middle"), (cx, cy + 18, "middle")):
+                x0 = lx if anchor == "start" else lx - tw if anchor == "end" else lx - tw / 2
+                box = (x0, ly - 11, x0 + tw, ly + 3)
+                if not any(box[0] < b[2] and b[0] < box[2] and box[1] < b[3] and b[1] < box[3] for b in boxes):
+                    break
+            boxes.append(box)
+            out.append(f'<text class="lab" x="{lx:.1f}" y="{ly:.1f}" text-anchor="{anchor}">{escape(t)}</text>')
     _write(path, out)
     return True

@@ -80,7 +80,76 @@ def figure(w, made, name, alt):
         w(f"![{alt}](figures/{name}.svg)\n")
 
 
+def key_policies(runs):
+    rows = [("all base", runs.get("base/full")), ("all monte", runs.get("monte/full")), ("all sum32", runs.get("sum32/full")),
+            ("base, rms_norm in sum32", runs.get("mixed/upgrade/rms_norm")),
+            ("base, rms_norm + residual in F32", runs.get("greedy-f32-residual+rms_norm")),
+            ("monte, residual in F32", runs.get("monte/protect/residual")),
+            ("sum32, residual in F32", runs.get("sum32/protect/residual"))]
+    steps = [r for r in runs.values() if r.get("part") == "greedy" and r.get("kind") == "sum32"]
+    if steps:
+        best = min(steps, key=lambda r: r["kl"])
+        rows.append(("best greedy sum32 mix", best))
+    return [(n, r) for n, r in rows if r]
+
+
+def summary(root):
+    models = sorted(d for d in os.listdir(root) if os.path.isfile(os.path.join(root, d, "runs.jsonl")))
+    data = {}
+    for m in models:
+        runs = {r["id"]: r for r in runlib.load_jsonl(os.path.join(root, m, "runs.jsonl"))}
+        data[m] = (runs, group_costs(load_graph(os.path.join(root, m, "graph.tsv"))))
+    figs = os.path.join(root, "figures")
+    shorts = {m: m.split("-Instruct")[0] for m in models}
+    out = []
+    w = out.append
+    w("# Op sensitivity: both models\n")
+    w("Cross-model view of the per-model reports (" + ", ".join(f"[{shorts[m]}]({m}/REPORT.md)" for m in models) + ").\n")
+    groups = [g for g, _ in GROUPS if any(data[m][1].get(g, 0) > 0 for m in models) and g != "gather"]
+    w("## Where the base-mode error comes from\n")
+    figure(w, plot.bar_chart(
+        os.path.join(figs, "share-base.svg"), "Share of the all-base KL caused by one group alone",
+        "KL with only that group in LNS (base mode), as % of the KL with every op in LNS", groups,
+        [(shorts[m], 5 + i, [data[m][0][f"base/isolate/{g}"]["kl"] / data[m][0]["base/full"]["kl"] * 100
+                            if f"base/isolate/{g}" in data[m][0] and data[m][1].get(g, 0) > 0 else None for g in groups])
+         for i, m in enumerate(models)], "% of the all-base KL"), "share-base", "share of base KL per group")
+    w("| group | " + " | ".join(f"{shorts[m]} KL alone | {shorts[m]} % of all-base | {shorts[m]} arithmetic share" for m in models) + " |")
+    w("|---|" + "---|---|---|" * len(models))
+    for g in groups:
+        cells = []
+        for m in models:
+            runs, cost = data[m]
+            r = runs.get(f"base/isolate/{g}")
+            if r and cost.get(g, 0) > 0:
+                cells += [num(r["kl"]), pct(r["kl"] / runs["base/full"]["kl"] * 100), pct(cost[g] * 100)]
+            else:
+                cells += ["-", "-", "-"]
+        w(f"| {g} | " + " | ".join(cells) + " |")
+    w("")
+    w("## Key configurations\n")
+    names = [n for n, _ in key_policies(data[models[0]][0])]
+    figure(w, plot.bar_chart(
+        os.path.join(figs, "policies.svg"), "Perplexity relative to F32 for the key configurations",
+        "perplexity of the prompt text divided by the F32 perplexity; 1 = as good as F32 (lpvip left out, see the reports)",
+        names, [(shorts[m], 5 + i, [next((r["ppl"] / r["ppl_ref"] for n, r in key_policies(data[m][0]) if n == name), None)
+                                    for name in names]) for i, m in enumerate(models)],
+        "perplexity / F32 perplexity", ref=[("F32", 1.0)]), "policies", "key configurations")
+    w("| configuration | " + " | ".join(f"{shorts[m]} KL | {shorts[m]} perplexity (F32 {data[m][0]['base/full']['ppl_ref']:.3f})" for m in models) + " |")
+    w("|---|" + "---|---|" * len(models))
+    for name in names:
+        cells = []
+        for m in models:
+            r = next((r for n, r in key_policies(data[m][0]) if n == name), None)
+            cells += [num(r["kl"]), f"{r['ppl']:.3f}"] if r else ["-", "-"]
+        w(f"| {name} | " + " | ".join(cells) + " |")
+    w("")
+    print("\n".join(out))
+
+
 def main():
+    if sys.argv[1] == "--summary":
+        summary(sys.argv[2])
+        return
     d = sys.argv[1]
     runs = {r["id"]: r for r in runlib.load_jsonl(os.path.join(d, "runs.jsonl"))}
     nodes = load_graph(os.path.join(d, "graph.tsv"))
@@ -114,7 +183,27 @@ def main():
             w(f"| {m} | {num(r['kl'])} | {r['top1']*100:.1f}% | {pct(r['logit_rel']*100)} | {r['ppl']:.3f} |")
     w("")
 
+    w("## Key configurations\n")
+    pol = key_policies(runs)
+    figure(w, plot.bar_chart(
+        os.path.join(figs, "policies.svg"), f"{short}: perplexity of the key configurations",
+        f"perplexity of the prompt text; the line is the F32 reference ({any_run['ppl_ref']:.3f}); lpvip left out (section 1)",
+        [n for n, _ in pol], [("perplexity", 6, [r["ppl"] for _, r in pol])], "perplexity",
+        ref=[("F32", any_run["ppl_ref"])], labels=True), "policies", "key configurations")
+    w("| configuration | KL | top-1 agree | perplexity |")
+    w("|---|---|---|---|")
+    for n, r in pol:
+        extra = f" ({', '.join(r['groups'])})" if r.get("part") == "greedy" else ""
+        w(f"| {n}{extra} | {num(r['kl'])} | {r['top1']*100:.1f}% | {r['ppl']:.3f} |")
+    w("")
+
     w("## 2. Cost share of each op group\n")
+    figure(w, plot.scatter(
+        os.path.join(figs, "cost-damage.svg"), f"{short}: cost against damage, base mode",
+        "share of the arithmetic (x) against the KL a group causes alone in LNS (y), both log scale",
+        [("base", plot.slot("base", 0), [(cost[g] * 100, runs[f"base/isolate/{g}"]["kl"], g) for g in present
+                                         if f"base/isolate/{g}" in runs])],
+        "share of the arithmetic (%)", "KL alone (nats)", xlog=True, ylog=True), "cost-damage", "cost against damage")
     w("Share of the arithmetic of one forward pass over the first prompt (MUL_MAT: K multiply-adds per output; "
       "other ops: one per output element).\n")
     w("| Group | selector | share |")
@@ -177,6 +266,12 @@ def main():
             "KL from the F32 reference caused by each layer alone (nats, log scale)",
             [(m, plot.slot(m, i), [(L, runs[f"{m}/layer-isolate/{L}"]["kl"]) for L in layers if f"{m}/layer-isolate/{L}" in runs])
              for i, m in enumerate(modes)], "layer", "KL (nats)", ylog=True), "layers", "KL per layer")
+        figure(w, plot.line_chart(
+            os.path.join(figs, "layers-protect.svg"), f"{short}: one layer kept in F32, the rest LNS",
+            "share of the all-LNS KL that disappears when only that layer is exact; negative = it gets worse",
+            [(m, plot.slot(m, i), [(L, (runs[f"{m}/full"]["kl"] - runs[f"{m}/layer-protect/{L}"]["kl"]) / runs[f"{m}/full"]["kl"] * 100)
+                                   for L in layers if f"{m}/layer-protect/{L}" in runs]) for i, m in enumerate(modes)],
+            "layer", "error removed (%)"), "layers-protect", "error removed per layer")
         w("| Layer | " + " | ".join(f"{m} only L | {m} all but L" for m in MODES) + " |")
         w("|---|" + "---|---|" * len(MODES))
         for L in layers:
