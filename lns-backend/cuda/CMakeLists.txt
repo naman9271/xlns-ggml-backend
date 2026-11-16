@@ -41,6 +41,7 @@ ggml_add_backend_library(ggml-lnscuda
     lns-cuda-xlns16.cu
     lns-cuda-xlns32.cu
 )
+set_target_properties(ggml-lnscuda PROPERTIES CUDA_STANDARD 14 CUDA_STANDARD_REQUIRED ON)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../ggml-lns-common/lns-common.cmake)
 lns_backend_common_setup(ggml-lnscuda)
