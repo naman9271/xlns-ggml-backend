@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" role="img">
+<title>Qwen2.5-0.5B: greedy policies, starting from all base</title><desc>KL after each step against the share of the arithmetic no longer in xlns16 base (KL 0 is not drawn)</desc>
+<style>svg{--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--s0:#2a78d6;--s1:#eb6834;--s2:#1baf7a;--s3:#eda100;--s4:#e87ba4;--s5:#008300;--s6:#6250d6;--s7:#e34948}@media (prefers-color-scheme: dark){svg{--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--s0:#3987e5;--s1:#d95926;--s2:#199e70;--s3:#c98500;--s4:#d55181;--s5:#0ca30c;--s6:#9085e9;--s7:#e66767}}text{font-family:system-ui, -apple-system, "Segoe UI", sans-serif;fill:var(--ink2);font-size:12px}.title{fill:var(--ink);font-size:15px;font-weight:600}.sub{fill:var(--ink2);font-size:12px}.tick{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}.lab{fill:var(--ink2);font-size:12px}.grid{stroke:var(--grid);stroke-width:1}.axis{stroke:var(--axis);stroke-width:1}.ref{stroke:var(--muted);stroke-width:1}.l0{stroke:var(--s0);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f0{fill:var(--s0)}.l1{stroke:var(--s1);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f1{fill:var(--s1)}.l2{stroke:var(--s2);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f2{fill:var(--s2)}.l3{stroke:var(--s3);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f3{fill:var(--s3)}.l4{stroke:var(--s4);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f4{fill:var(--s4)}.l5{stroke:var(--s5);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f5{fill:var(--s5)}.l6{stroke:var(--s6);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f6{fill:var(--s6)}.l7{stroke:var(--s7);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f7{fill:var(--s7)}</style>
+<rect width="760" height="440" rx="8" style="fill:var(--surface)"/>
+<text class="title" x="76" y="28">Qwen2.5-0.5B: greedy policies, starting from all base</text>
+<text class="sub" x="76" y="48">KL after each step against the share of the arithmetic no longer in xlns16 base (KL 0 is not drawn)</text>
+<line class="l3" x1="76" y1="68" x2="94" y2="68"/>
+<circle class="f3" cx="85" cy="68" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<text class="lab" x="100" y="72">groups moved to sum32</text>
+<line class="l6" x1="272" y1="68" x2="290" y2="68"/>
+<circle class="f6" cx="281" cy="68" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<text class="lab" x="296" y="72">groups moved to F32</text>
+<line class="grid" x1="76" y1="384.0" x2="736" y2="384.0"/>
+<text class="tick" x="68" y="388.0" text-anchor="end">1e-3</text>
+<line class="grid" x1="76" y1="286.7" x2="736" y2="286.7"/>
+<text class="tick" x="68" y="290.7" text-anchor="end">0.01</text>
+<line class="grid" x1="76" y1="189.3" x2="736" y2="189.3"/>
+<text class="tick" x="68" y="193.3" text-anchor="end">0.1</text>
+<line class="grid" x1="76" y1="92.0" x2="736" y2="92.0"/>
+<text class="tick" x="68" y="96.0" text-anchor="end">1</text>
+<line class="axis" x1="84.0" y1="384" x2="84.0" y2="388"/>
+<text class="tick" x="84.0" y="402" text-anchor="middle">0</text>
+<line class="axis" x1="212.9" y1="384" x2="212.9" y2="388"/>
+<text class="tick" x="212.9" y="402" text-anchor="middle">20</text>
+<line class="axis" x1="341.7" y1="384" x2="341.7" y2="388"/>
+<text class="tick" x="341.7" y="402" text-anchor="middle">40</text>
+<line class="axis" x1="470.6" y1="384" x2="470.6" y2="388"/>
+<text class="tick" x="470.6" y="402" text-anchor="middle">60</text>
+<line class="axis" x1="599.5" y1="384" x2="599.5" y2="388"/>
+<text class="tick" x="599.5" y="402" text-anchor="middle">80</text>
+<line class="axis" x1="76" y1="384" x2="736" y2="384"/>
+<text class="lab" x="406.0" y="428" text-anchor="middle">share of the arithmetic upgraded (%)</text>
+<text class="lab" transform="translate(16,238.0) rotate(-90)" text-anchor="middle">KL (nats)</text>
+<polyline class="l3" points="84.0,123.1 84.1,144.9 217.4,153.4 391.0,163.2 422.6,169.2 429.6,172.7 429.7,172.5 436.7,172.7 461.3,171.5 728.0,167.5"/>
+<circle class="f3" cx="84.0" cy="123.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="84.1" cy="144.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="217.4" cy="153.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="391.0" cy="163.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="422.6" cy="169.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="429.6" cy="172.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="429.7" cy="172.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="436.7" cy="172.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="461.3" cy="171.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f3" cx="728.0" cy="167.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<polyline class="l6" points="84.0,123.1 84.1,145.4 84.1,165.1 350.8,183.5 524.4,203.7 657.8,225.3 689.3,271.2 696.4,299.0 696.4,307.9 696.5,313.7 721.1,323.1 721.1,326.1 721.2,327.2 721.3,336.0"/>
+<circle class="f6" cx="84.0" cy="123.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="84.1" cy="145.4" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="84.1" cy="165.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="350.8" cy="183.5" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="524.4" cy="203.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="657.8" cy="225.3" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="689.3" cy="271.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="696.4" cy="299.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="696.4" cy="307.9" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="696.5" cy="313.7" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="721.1" cy="323.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="721.1" cy="326.1" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="721.2" cy="327.2" r="4" style="stroke:var(--surface);stroke-width:2"/>
+<circle class="f6" cx="721.3" cy="336.0" r="4" style="stroke:var(--surface);stroke-width:2"/>
+</svg>

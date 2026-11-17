@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fnmatch.h>
 #include <string>
 #include <strings.h>
 #include <vector>
@@ -143,19 +144,58 @@ inline bool backend_selected(const char * device_name) {
 // (case-insensitive) or, failing that, is a case-sensitive substring of the
 // tensor name ("ffn_down", "result_output").
 
-inline bool op_disabled_by_env(const ggml_tensor * op) {
-    static const std::vector<std::string> tokens = []() {
-        const char * env = std::getenv("LNS_DISABLE_OPS");
-        return env ? split_list(env) : std::vector<std::string>();
-    }();
-    const char * name = ggml_op_name(op->op);
+inline bool name_matches(const char * name, const std::string & pattern) {
+    if (name == nullptr || name[0] == '\0') {
+        return false;
+    }
+    if (pattern.find_first_of("*?[") != std::string::npos) {
+        return fnmatch(pattern.c_str(), name, 0) == 0;
+    }
+    return std::strstr(name, pattern.c_str()) != nullptr;
+}
+
+inline bool op_matches(const ggml_tensor * op, const std::string & tok) {
+    const char * op_name = ggml_op_name(op->op);
+    if (strcasecmp(tok.c_str(), op_name) == 0 || strcasecmp(tok.c_str(), ggml_op_desc(op)) == 0) {
+        return true;
+    }
+    std::string pattern = tok;
+    const size_t colon = tok.find(':');
+    if (colon != std::string::npos) {
+        const std::string want = tok.substr(0, colon);
+        if (strcasecmp(want.c_str(), op_name) != 0 && strcasecmp(want.c_str(), ggml_op_desc(op)) != 0) {
+            return false;
+        }
+        pattern = tok.substr(colon + 1);
+    }
+    if (!pattern.empty() && pattern[0] == '<') {
+        return op->src[1] != nullptr && name_matches(op->src[1]->name, pattern.substr(1));
+    }
+    return name_matches(op->name, pattern);
+}
+
+inline bool op_matches_any(const ggml_tensor * op, const std::vector<std::string> & tokens) {
     for (const std::string & tok : tokens) {
-        if (strcasecmp(tok.c_str(), name) == 0 ||
-            (op->name[0] != '\0' && std::strstr(op->name, tok.c_str()) != nullptr)) {
+        if (op_matches(op, tok)) {
             return true;
         }
     }
     return false;
+}
+
+inline std::vector<std::string> env_list(const char * name) {
+    const char * env = std::getenv(name);
+    return env ? split_list(env) : std::vector<std::string>();
+}
+
+inline bool op_disabled_by_env(const ggml_tensor * op) {
+    static const std::vector<std::string> disabled = env_list("LNS_DISABLE_OPS");
+    static const char * enabled_env = std::getenv("LNS_ENABLE_OPS");
+    static const std::vector<std::string> enabled = env_list("LNS_ENABLE_OPS");
+    if (enabled_env != nullptr && !op_matches_any(op, enabled)) {
+        return true;
+    }
+    return op_matches_any(op, disabled);
 }
 
 // ============================================================

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" role="img">
+<title>Qwen2.5-0.5B: one group&#x27;s sums in sum32, the rest base</title><desc>share of the base to all-sum32 KL gap closed by upgrading only that group</desc>
+<style>svg{--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--s0:#2a78d6;--s1:#eb6834;--s2:#1baf7a;--s3:#eda100;--s4:#e87ba4;--s5:#008300;--s6:#6250d6;--s7:#e34948}@media (prefers-color-scheme: dark){svg{--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--s0:#3987e5;--s1:#d95926;--s2:#199e70;--s3:#c98500;--s4:#d55181;--s5:#0ca30c;--s6:#9085e9;--s7:#e66767}}text{font-family:system-ui, -apple-system, "Segoe UI", sans-serif;fill:var(--ink2);font-size:12px}.title{fill:var(--ink);font-size:15px;font-weight:600}.sub{fill:var(--ink2);font-size:12px}.tick{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}.lab{fill:var(--ink2);font-size:12px}.grid{stroke:var(--grid);stroke-width:1}.axis{stroke:var(--axis);stroke-width:1}.ref{stroke:var(--muted);stroke-width:1}.l0{stroke:var(--s0);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f0{fill:var(--s0)}.l1{stroke:var(--s1);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f1{fill:var(--s1)}.l2{stroke:var(--s2);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f2{fill:var(--s2)}.l3{stroke:var(--s3);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f3{fill:var(--s3)}.l4{stroke:var(--s4);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f4{fill:var(--s4)}.l5{stroke:var(--s5);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f5{fill:var(--s5)}.l6{stroke:var(--s6);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f6{fill:var(--s6)}.l7{stroke:var(--s7);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f7{fill:var(--s7)}</style>
+<rect width="760" height="440" rx="8" style="fill:var(--surface)"/>
+<text class="title" x="76" y="28">Qwen2.5-0.5B: one group&#x27;s sums in sum32, the rest base</text>
+<text class="sub" x="76" y="48">share of the base to all-sum32 KL gap closed by upgrading only that group</text>
+<line class="grid" x1="225.1" y1="92" x2="225.1" y2="384"/>
+<text class="tick" x="225.1" y="402" text-anchor="middle">0</text>
+<line class="grid" x1="378.6" y1="92" x2="378.6" y2="384"/>
+<text class="tick" x="378.6" y="402" text-anchor="middle">20</text>
+<line class="grid" x1="532.2" y1="92" x2="532.2" y2="384"/>
+<text class="tick" x="532.2" y="402" text-anchor="middle">40</text>
+<line class="grid" x1="685.8" y1="92" x2="685.8" y2="384"/>
+<text class="tick" x="685.8" y="402" text-anchor="middle">60</text>
+<text class="lab" x="441.0" y="428" text-anchor="middle">gap closed (%)</text>
+<text class="lab" x="138" y="112.2" text-anchor="end">qkv_proj</text>
+<path class="f3" d="M225.1,96.0 H434.6 Q438.6,96.0 438.6,100.0 V114.4 Q438.6,118.4 434.6,118.4 H225.1 Z"/>
+<text class="lab" x="138" y="144.7" text-anchor="end">kq</text>
+<path class="f3" d="M225.1,128.4 H416.4 Q420.4,128.4 420.4,132.4 V146.9 Q420.4,150.9 416.4,150.9 H225.1 Z"/>
+<text class="lab" x="138" y="177.1" text-anchor="end">softmax</text>
+<path class="f3" d="M225.1,160.9 H176.5 Q172.5,160.9 172.5,164.9 V179.3 Q172.5,183.3 176.5,183.3 H225.1 Z"/>
+<text class="lab" x="138" y="209.6" text-anchor="end">kqv</text>
+<path class="f3" d="M225.1,193.3 H236.3 Q240.3,193.3 240.3,197.3 V211.8 Q240.3,215.8 236.3,215.8 H225.1 Z"/>
+<text class="lab" x="138" y="242.0" text-anchor="end">attn_out</text>
+<path class="f3" d="M225.1,225.8 H329.0 Q333.0,225.8 333.0,229.8 V244.2 Q333.0,248.2 329.0,248.2 H225.1 Z"/>
+<text class="lab" x="138" y="274.4" text-anchor="end">ffn_gate_up</text>
+<path class="f3" d="M225.1,258.2 H280.4 Q284.4,258.2 284.4,262.2 V276.7 Q284.4,280.7 280.4,280.7 H225.1 Z"/>
+<text class="lab" x="138" y="306.9" text-anchor="end">ffn_down</text>
+<path class="f3" d="M225.1,290.7 H471.4 Q475.4,290.7 475.4,294.7 V309.1 Q475.4,313.1 471.4,313.1 H225.1 Z"/>
+<text class="lab" x="138" y="339.3" text-anchor="end">rms_norm</text>
+<path class="f3" d="M225.1,323.1 H697.5 Q701.5,323.1 701.5,327.1 V341.6 Q701.5,345.6 697.5,345.6 H225.1 Z"/>
+<text class="lab" x="138" y="371.8" text-anchor="end">lm_head</text>
+<path class="f3" d="M225.1,355.6 H352.5 Q356.5,355.6 356.5,359.6 V374.0 Q356.5,378.0 352.5,378.0 H225.1 Z"/>
+<line class="axis" x1="225.1" y1="92" x2="225.1" y2="384"/>
+</svg>

@@ -1,0 +1,1087 @@
+name	op	desc	src1	K	nelements
+embd	GET_ROWS	GET_ROWS	inp_tokens	0	39168
+norm-0	RMS_NORM	RMS_NORM		0	39168
+attn_norm-0	MUL	MUL	blk.0.attn_norm.weight	0	39168
+Qcur-0	MUL_MAT	MUL_MAT	attn_norm-0	576	39168
+Qcur-0	RESHAPE	RESHAPE		0	39168
+Qcur-0	ROPE	ROPE	leaf_5	0	39168
+Vcur-0	MUL_MAT	MUL_MAT	attn_norm-0	576	13056
+Vcur-0	RESHAPE	RESHAPE		0	13056
+Kcur-0	MUL_MAT	MUL_MAT	attn_norm-0	576	13056
+Kcur-0	RESHAPE	RESHAPE		0	13056
+Kcur-0	ROPE	ROPE	leaf_5	0	13056
+Kcur-0 (view)	VIEW	VIEW		0	13056
+cache_k_l0 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-0 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-0 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l0 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l0 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l0 (view)	VIEW	VIEW		0	49152
+cache_v_l0 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l0 (view)	VIEW	VIEW		0	49152
+cache_k_l0 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-0 (view)	VIEW	VIEW		0	39168
+Qcur-0 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-0	MUL_MAT	MUL_MAT	Qcur-0 (view) (permuted)	64	156672
+kq_soft_max-0	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-0	MUL_MAT	MUL_MAT	kq_soft_max-0	256	39168
+kqv-0 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-0	CONT	CONT		0	39168
+attn_out-0	MUL_MAT	MUL_MAT	kqv_out-0	576	39168
+ffn_inp-0	ADD	ADD	embd	0	39168
+norm-0	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-0	MUL	MUL	blk.0.ffn_norm.weight	0	39168
+ffn_gate-0	MUL_MAT	MUL_MAT	ffn_norm-0	576	104448
+ffn_up-0	MUL_MAT	MUL_MAT	ffn_norm-0	576	104448
+ffn_swiglu-0	GLU	SWIGLU	ffn_up-0	0	104448
+ffn_out-0	MUL_MAT	MUL_MAT	ffn_swiglu-0	1536	39168
+l_out-0	ADD	ADD	ffn_inp-0	0	39168
+norm-1	RMS_NORM	RMS_NORM		0	39168
+attn_norm-1	MUL	MUL	blk.1.attn_norm.weight	0	39168
+Qcur-1	MUL_MAT	MUL_MAT	attn_norm-1	576	39168
+Qcur-1	RESHAPE	RESHAPE		0	39168
+Qcur-1	ROPE	ROPE	leaf_5	0	39168
+Vcur-1	MUL_MAT	MUL_MAT	attn_norm-1	576	13056
+Vcur-1	RESHAPE	RESHAPE		0	13056
+Kcur-1	MUL_MAT	MUL_MAT	attn_norm-1	576	13056
+Kcur-1	RESHAPE	RESHAPE		0	13056
+Kcur-1	ROPE	ROPE	leaf_5	0	13056
+Kcur-1 (view)	VIEW	VIEW		0	13056
+cache_k_l1 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-1 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-1 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l1 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l1 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l1 (view)	VIEW	VIEW		0	49152
+cache_v_l1 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l1 (view)	VIEW	VIEW		0	49152
+cache_k_l1 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-1 (view)	VIEW	VIEW		0	39168
+Qcur-1 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-1	MUL_MAT	MUL_MAT	Qcur-1 (view) (permuted)	64	156672
+kq_soft_max-1	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-1	MUL_MAT	MUL_MAT	kq_soft_max-1	256	39168
+kqv-1 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-1	CONT	CONT		0	39168
+attn_out-1	MUL_MAT	MUL_MAT	kqv_out-1	576	39168
+ffn_inp-1	ADD	ADD	l_out-0	0	39168
+norm-1	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-1	MUL	MUL	blk.1.ffn_norm.weight	0	39168
+ffn_gate-1	MUL_MAT	MUL_MAT	ffn_norm-1	576	104448
+ffn_up-1	MUL_MAT	MUL_MAT	ffn_norm-1	576	104448
+ffn_swiglu-1	GLU	SWIGLU	ffn_up-1	0	104448
+ffn_out-1	MUL_MAT	MUL_MAT	ffn_swiglu-1	1536	39168
+l_out-1	ADD	ADD	ffn_inp-1	0	39168
+norm-2	RMS_NORM	RMS_NORM		0	39168
+attn_norm-2	MUL	MUL	blk.2.attn_norm.weight	0	39168
+Qcur-2	MUL_MAT	MUL_MAT	attn_norm-2	576	39168
+Qcur-2	RESHAPE	RESHAPE		0	39168
+Qcur-2	ROPE	ROPE	leaf_5	0	39168
+Vcur-2	MUL_MAT	MUL_MAT	attn_norm-2	576	13056
+Vcur-2	RESHAPE	RESHAPE		0	13056
+Kcur-2	MUL_MAT	MUL_MAT	attn_norm-2	576	13056
+Kcur-2	RESHAPE	RESHAPE		0	13056
+Kcur-2	ROPE	ROPE	leaf_5	0	13056
+Kcur-2 (view)	VIEW	VIEW		0	13056
+cache_k_l2 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-2 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-2 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l2 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l2 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l2 (view)	VIEW	VIEW		0	49152
+cache_v_l2 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l2 (view)	VIEW	VIEW		0	49152
+cache_k_l2 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-2 (view)	VIEW	VIEW		0	39168
+Qcur-2 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-2	MUL_MAT	MUL_MAT	Qcur-2 (view) (permuted)	64	156672
+kq_soft_max-2	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-2	MUL_MAT	MUL_MAT	kq_soft_max-2	256	39168
+kqv-2 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-2	CONT	CONT		0	39168
+attn_out-2	MUL_MAT	MUL_MAT	kqv_out-2	576	39168
+ffn_inp-2	ADD	ADD	l_out-1	0	39168
+norm-2	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-2	MUL	MUL	blk.2.ffn_norm.weight	0	39168
+ffn_gate-2	MUL_MAT	MUL_MAT	ffn_norm-2	576	104448
+ffn_up-2	MUL_MAT	MUL_MAT	ffn_norm-2	576	104448
+ffn_swiglu-2	GLU	SWIGLU	ffn_up-2	0	104448
+ffn_out-2	MUL_MAT	MUL_MAT	ffn_swiglu-2	1536	39168
+l_out-2	ADD	ADD	ffn_inp-2	0	39168
+norm-3	RMS_NORM	RMS_NORM		0	39168
+attn_norm-3	MUL	MUL	blk.3.attn_norm.weight	0	39168
+Qcur-3	MUL_MAT	MUL_MAT	attn_norm-3	576	39168
+Qcur-3	RESHAPE	RESHAPE		0	39168
+Qcur-3	ROPE	ROPE	leaf_5	0	39168
+Vcur-3	MUL_MAT	MUL_MAT	attn_norm-3	576	13056
+Vcur-3	RESHAPE	RESHAPE		0	13056
+Kcur-3	MUL_MAT	MUL_MAT	attn_norm-3	576	13056
+Kcur-3	RESHAPE	RESHAPE		0	13056
+Kcur-3	ROPE	ROPE	leaf_5	0	13056
+Kcur-3 (view)	VIEW	VIEW		0	13056
+cache_k_l3 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-3 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-3 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l3 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l3 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l3 (view)	VIEW	VIEW		0	49152
+cache_v_l3 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l3 (view)	VIEW	VIEW		0	49152
+cache_k_l3 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-3 (view)	VIEW	VIEW		0	39168
+Qcur-3 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-3	MUL_MAT	MUL_MAT	Qcur-3 (view) (permuted)	64	156672
+kq_soft_max-3	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-3	MUL_MAT	MUL_MAT	kq_soft_max-3	256	39168
+kqv-3 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-3	CONT	CONT		0	39168
+attn_out-3	MUL_MAT	MUL_MAT	kqv_out-3	576	39168
+ffn_inp-3	ADD	ADD	l_out-2	0	39168
+norm-3	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-3	MUL	MUL	blk.3.ffn_norm.weight	0	39168
+ffn_gate-3	MUL_MAT	MUL_MAT	ffn_norm-3	576	104448
+ffn_up-3	MUL_MAT	MUL_MAT	ffn_norm-3	576	104448
+ffn_swiglu-3	GLU	SWIGLU	ffn_up-3	0	104448
+ffn_out-3	MUL_MAT	MUL_MAT	ffn_swiglu-3	1536	39168
+l_out-3	ADD	ADD	ffn_inp-3	0	39168
+norm-4	RMS_NORM	RMS_NORM		0	39168
+attn_norm-4	MUL	MUL	blk.4.attn_norm.weight	0	39168
+Qcur-4	MUL_MAT	MUL_MAT	attn_norm-4	576	39168
+Qcur-4	RESHAPE	RESHAPE		0	39168
+Qcur-4	ROPE	ROPE	leaf_5	0	39168
+Vcur-4	MUL_MAT	MUL_MAT	attn_norm-4	576	13056
+Vcur-4	RESHAPE	RESHAPE		0	13056
+Kcur-4	MUL_MAT	MUL_MAT	attn_norm-4	576	13056
+Kcur-4	RESHAPE	RESHAPE		0	13056
+Kcur-4	ROPE	ROPE	leaf_5	0	13056
+Kcur-4 (view)	VIEW	VIEW		0	13056
+cache_k_l4 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-4 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-4 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l4 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l4 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l4 (view)	VIEW	VIEW		0	49152
+cache_v_l4 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l4 (view)	VIEW	VIEW		0	49152
+cache_k_l4 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-4 (view)	VIEW	VIEW		0	39168
+Qcur-4 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-4	MUL_MAT	MUL_MAT	Qcur-4 (view) (permuted)	64	156672
+kq_soft_max-4	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-4	MUL_MAT	MUL_MAT	kq_soft_max-4	256	39168
+kqv-4 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-4	CONT	CONT		0	39168
+attn_out-4	MUL_MAT	MUL_MAT	kqv_out-4	576	39168
+ffn_inp-4	ADD	ADD	l_out-3	0	39168
+norm-4	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-4	MUL	MUL	blk.4.ffn_norm.weight	0	39168
+ffn_gate-4	MUL_MAT	MUL_MAT	ffn_norm-4	576	104448
+ffn_up-4	MUL_MAT	MUL_MAT	ffn_norm-4	576	104448
+ffn_swiglu-4	GLU	SWIGLU	ffn_up-4	0	104448
+ffn_out-4	MUL_MAT	MUL_MAT	ffn_swiglu-4	1536	39168
+l_out-4	ADD	ADD	ffn_inp-4	0	39168
+norm-5	RMS_NORM	RMS_NORM		0	39168
+attn_norm-5	MUL	MUL	blk.5.attn_norm.weight	0	39168
+Qcur-5	MUL_MAT	MUL_MAT	attn_norm-5	576	39168
+Qcur-5	RESHAPE	RESHAPE		0	39168
+Qcur-5	ROPE	ROPE	leaf_5	0	39168
+Vcur-5	MUL_MAT	MUL_MAT	attn_norm-5	576	13056
+Vcur-5	RESHAPE	RESHAPE		0	13056
+Kcur-5	MUL_MAT	MUL_MAT	attn_norm-5	576	13056
+Kcur-5	RESHAPE	RESHAPE		0	13056
+Kcur-5	ROPE	ROPE	leaf_5	0	13056
+Kcur-5 (view)	VIEW	VIEW		0	13056
+cache_k_l5 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-5 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-5 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l5 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l5 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l5 (view)	VIEW	VIEW		0	49152
+cache_v_l5 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l5 (view)	VIEW	VIEW		0	49152
+cache_k_l5 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-5 (view)	VIEW	VIEW		0	39168
+Qcur-5 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-5	MUL_MAT	MUL_MAT	Qcur-5 (view) (permuted)	64	156672
+kq_soft_max-5	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-5	MUL_MAT	MUL_MAT	kq_soft_max-5	256	39168
+kqv-5 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-5	CONT	CONT		0	39168
+attn_out-5	MUL_MAT	MUL_MAT	kqv_out-5	576	39168
+ffn_inp-5	ADD	ADD	l_out-4	0	39168
+norm-5	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-5	MUL	MUL	blk.5.ffn_norm.weight	0	39168
+ffn_gate-5	MUL_MAT	MUL_MAT	ffn_norm-5	576	104448
+ffn_up-5	MUL_MAT	MUL_MAT	ffn_norm-5	576	104448
+ffn_swiglu-5	GLU	SWIGLU	ffn_up-5	0	104448
+ffn_out-5	MUL_MAT	MUL_MAT	ffn_swiglu-5	1536	39168
+l_out-5	ADD	ADD	ffn_inp-5	0	39168
+norm-6	RMS_NORM	RMS_NORM		0	39168
+attn_norm-6	MUL	MUL	blk.6.attn_norm.weight	0	39168
+Qcur-6	MUL_MAT	MUL_MAT	attn_norm-6	576	39168
+Qcur-6	RESHAPE	RESHAPE		0	39168
+Qcur-6	ROPE	ROPE	leaf_5	0	39168
+Vcur-6	MUL_MAT	MUL_MAT	attn_norm-6	576	13056
+Vcur-6	RESHAPE	RESHAPE		0	13056
+Kcur-6	MUL_MAT	MUL_MAT	attn_norm-6	576	13056
+Kcur-6	RESHAPE	RESHAPE		0	13056
+Kcur-6	ROPE	ROPE	leaf_5	0	13056
+Kcur-6 (view)	VIEW	VIEW		0	13056
+cache_k_l6 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-6 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-6 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l6 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l6 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l6 (view)	VIEW	VIEW		0	49152
+cache_v_l6 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l6 (view)	VIEW	VIEW		0	49152
+cache_k_l6 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-6 (view)	VIEW	VIEW		0	39168
+Qcur-6 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-6	MUL_MAT	MUL_MAT	Qcur-6 (view) (permuted)	64	156672
+kq_soft_max-6	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-6	MUL_MAT	MUL_MAT	kq_soft_max-6	256	39168
+kqv-6 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-6	CONT	CONT		0	39168
+attn_out-6	MUL_MAT	MUL_MAT	kqv_out-6	576	39168
+ffn_inp-6	ADD	ADD	l_out-5	0	39168
+norm-6	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-6	MUL	MUL	blk.6.ffn_norm.weight	0	39168
+ffn_gate-6	MUL_MAT	MUL_MAT	ffn_norm-6	576	104448
+ffn_up-6	MUL_MAT	MUL_MAT	ffn_norm-6	576	104448
+ffn_swiglu-6	GLU	SWIGLU	ffn_up-6	0	104448
+ffn_out-6	MUL_MAT	MUL_MAT	ffn_swiglu-6	1536	39168
+l_out-6	ADD	ADD	ffn_inp-6	0	39168
+norm-7	RMS_NORM	RMS_NORM		0	39168
+attn_norm-7	MUL	MUL	blk.7.attn_norm.weight	0	39168
+Qcur-7	MUL_MAT	MUL_MAT	attn_norm-7	576	39168
+Qcur-7	RESHAPE	RESHAPE		0	39168
+Qcur-7	ROPE	ROPE	leaf_5	0	39168
+Vcur-7	MUL_MAT	MUL_MAT	attn_norm-7	576	13056
+Vcur-7	RESHAPE	RESHAPE		0	13056
+Kcur-7	MUL_MAT	MUL_MAT	attn_norm-7	576	13056
+Kcur-7	RESHAPE	RESHAPE		0	13056
+Kcur-7	ROPE	ROPE	leaf_5	0	13056
+Kcur-7 (view)	VIEW	VIEW		0	13056
+cache_k_l7 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-7 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-7 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l7 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l7 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l7 (view)	VIEW	VIEW		0	49152
+cache_v_l7 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l7 (view)	VIEW	VIEW		0	49152
+cache_k_l7 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-7 (view)	VIEW	VIEW		0	39168
+Qcur-7 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-7	MUL_MAT	MUL_MAT	Qcur-7 (view) (permuted)	64	156672
+kq_soft_max-7	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-7	MUL_MAT	MUL_MAT	kq_soft_max-7	256	39168
+kqv-7 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-7	CONT	CONT		0	39168
+attn_out-7	MUL_MAT	MUL_MAT	kqv_out-7	576	39168
+ffn_inp-7	ADD	ADD	l_out-6	0	39168
+norm-7	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-7	MUL	MUL	blk.7.ffn_norm.weight	0	39168
+ffn_gate-7	MUL_MAT	MUL_MAT	ffn_norm-7	576	104448
+ffn_up-7	MUL_MAT	MUL_MAT	ffn_norm-7	576	104448
+ffn_swiglu-7	GLU	SWIGLU	ffn_up-7	0	104448
+ffn_out-7	MUL_MAT	MUL_MAT	ffn_swiglu-7	1536	39168
+l_out-7	ADD	ADD	ffn_inp-7	0	39168
+norm-8	RMS_NORM	RMS_NORM		0	39168
+attn_norm-8	MUL	MUL	blk.8.attn_norm.weight	0	39168
+Qcur-8	MUL_MAT	MUL_MAT	attn_norm-8	576	39168
+Qcur-8	RESHAPE	RESHAPE		0	39168
+Qcur-8	ROPE	ROPE	leaf_5	0	39168
+Vcur-8	MUL_MAT	MUL_MAT	attn_norm-8	576	13056
+Vcur-8	RESHAPE	RESHAPE		0	13056
+Kcur-8	MUL_MAT	MUL_MAT	attn_norm-8	576	13056
+Kcur-8	RESHAPE	RESHAPE		0	13056
+Kcur-8	ROPE	ROPE	leaf_5	0	13056
+Kcur-8 (view)	VIEW	VIEW		0	13056
+cache_k_l8 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-8 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-8 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l8 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l8 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l8 (view)	VIEW	VIEW		0	49152
+cache_v_l8 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l8 (view)	VIEW	VIEW		0	49152
+cache_k_l8 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-8 (view)	VIEW	VIEW		0	39168
+Qcur-8 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-8	MUL_MAT	MUL_MAT	Qcur-8 (view) (permuted)	64	156672
+kq_soft_max-8	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-8	MUL_MAT	MUL_MAT	kq_soft_max-8	256	39168
+kqv-8 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-8	CONT	CONT		0	39168
+attn_out-8	MUL_MAT	MUL_MAT	kqv_out-8	576	39168
+ffn_inp-8	ADD	ADD	l_out-7	0	39168
+norm-8	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-8	MUL	MUL	blk.8.ffn_norm.weight	0	39168
+ffn_gate-8	MUL_MAT	MUL_MAT	ffn_norm-8	576	104448
+ffn_up-8	MUL_MAT	MUL_MAT	ffn_norm-8	576	104448
+ffn_swiglu-8	GLU	SWIGLU	ffn_up-8	0	104448
+ffn_out-8	MUL_MAT	MUL_MAT	ffn_swiglu-8	1536	39168
+l_out-8	ADD	ADD	ffn_inp-8	0	39168
+norm-9	RMS_NORM	RMS_NORM		0	39168
+attn_norm-9	MUL	MUL	blk.9.attn_norm.weight	0	39168
+Qcur-9	MUL_MAT	MUL_MAT	attn_norm-9	576	39168
+Qcur-9	RESHAPE	RESHAPE		0	39168
+Qcur-9	ROPE	ROPE	leaf_5	0	39168
+Vcur-9	MUL_MAT	MUL_MAT	attn_norm-9	576	13056
+Vcur-9	RESHAPE	RESHAPE		0	13056
+Kcur-9	MUL_MAT	MUL_MAT	attn_norm-9	576	13056
+Kcur-9	RESHAPE	RESHAPE		0	13056
+Kcur-9	ROPE	ROPE	leaf_5	0	13056
+Kcur-9 (view)	VIEW	VIEW		0	13056
+cache_k_l9 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-9 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-9 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l9 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l9 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l9 (view)	VIEW	VIEW		0	49152
+cache_v_l9 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l9 (view)	VIEW	VIEW		0	49152
+cache_k_l9 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-9 (view)	VIEW	VIEW		0	39168
+Qcur-9 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-9	MUL_MAT	MUL_MAT	Qcur-9 (view) (permuted)	64	156672
+kq_soft_max-9	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-9	MUL_MAT	MUL_MAT	kq_soft_max-9	256	39168
+kqv-9 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-9	CONT	CONT		0	39168
+attn_out-9	MUL_MAT	MUL_MAT	kqv_out-9	576	39168
+ffn_inp-9	ADD	ADD	l_out-8	0	39168
+norm-9	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-9	MUL	MUL	blk.9.ffn_norm.weight	0	39168
+ffn_gate-9	MUL_MAT	MUL_MAT	ffn_norm-9	576	104448
+ffn_up-9	MUL_MAT	MUL_MAT	ffn_norm-9	576	104448
+ffn_swiglu-9	GLU	SWIGLU	ffn_up-9	0	104448
+ffn_out-9	MUL_MAT	MUL_MAT	ffn_swiglu-9	1536	39168
+l_out-9	ADD	ADD	ffn_inp-9	0	39168
+norm-10	RMS_NORM	RMS_NORM		0	39168
+attn_norm-10	MUL	MUL	blk.10.attn_norm.weight	0	39168
+Qcur-10	MUL_MAT	MUL_MAT	attn_norm-10	576	39168
+Qcur-10	RESHAPE	RESHAPE		0	39168
+Qcur-10	ROPE	ROPE	leaf_5	0	39168
+Vcur-10	MUL_MAT	MUL_MAT	attn_norm-10	576	13056
+Vcur-10	RESHAPE	RESHAPE		0	13056
+Kcur-10	MUL_MAT	MUL_MAT	attn_norm-10	576	13056
+Kcur-10	RESHAPE	RESHAPE		0	13056
+Kcur-10	ROPE	ROPE	leaf_5	0	13056
+Kcur-10 (view)	VIEW	VIEW		0	13056
+cache_k_l10 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-10 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-10 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l10 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l10 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l10 (view)	VIEW	VIEW		0	49152
+cache_v_l10 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l10 (view)	VIEW	VIEW		0	49152
+cache_k_l10 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-10 (view)	VIEW	VIEW		0	39168
+Qcur-10 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-10	MUL_MAT	MUL_MAT	Qcur-10 (view) (permuted)	64	156672
+kq_soft_max-10	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-10	MUL_MAT	MUL_MAT	kq_soft_max-10	256	39168
+kqv-10 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-10	CONT	CONT		0	39168
+attn_out-10	MUL_MAT	MUL_MAT	kqv_out-10	576	39168
+ffn_inp-10	ADD	ADD	l_out-9	0	39168
+norm-10	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-10	MUL	MUL	blk.10.ffn_norm.weight	0	39168
+ffn_gate-10	MUL_MAT	MUL_MAT	ffn_norm-10	576	104448
+ffn_up-10	MUL_MAT	MUL_MAT	ffn_norm-10	576	104448
+ffn_swiglu-10	GLU	SWIGLU	ffn_up-10	0	104448
+ffn_out-10	MUL_MAT	MUL_MAT	ffn_swiglu-10	1536	39168
+l_out-10	ADD	ADD	ffn_inp-10	0	39168
+norm-11	RMS_NORM	RMS_NORM		0	39168
+attn_norm-11	MUL	MUL	blk.11.attn_norm.weight	0	39168
+Qcur-11	MUL_MAT	MUL_MAT	attn_norm-11	576	39168
+Qcur-11	RESHAPE	RESHAPE		0	39168
+Qcur-11	ROPE	ROPE	leaf_5	0	39168
+Vcur-11	MUL_MAT	MUL_MAT	attn_norm-11	576	13056
+Vcur-11	RESHAPE	RESHAPE		0	13056
+Kcur-11	MUL_MAT	MUL_MAT	attn_norm-11	576	13056
+Kcur-11	RESHAPE	RESHAPE		0	13056
+Kcur-11	ROPE	ROPE	leaf_5	0	13056
+Kcur-11 (view)	VIEW	VIEW		0	13056
+cache_k_l11 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-11 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-11 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l11 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l11 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l11 (view)	VIEW	VIEW		0	49152
+cache_v_l11 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l11 (view)	VIEW	VIEW		0	49152
+cache_k_l11 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-11 (view)	VIEW	VIEW		0	39168
+Qcur-11 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-11	MUL_MAT	MUL_MAT	Qcur-11 (view) (permuted)	64	156672
+kq_soft_max-11	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-11	MUL_MAT	MUL_MAT	kq_soft_max-11	256	39168
+kqv-11 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-11	CONT	CONT		0	39168
+attn_out-11	MUL_MAT	MUL_MAT	kqv_out-11	576	39168
+ffn_inp-11	ADD	ADD	l_out-10	0	39168
+norm-11	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-11	MUL	MUL	blk.11.ffn_norm.weight	0	39168
+ffn_gate-11	MUL_MAT	MUL_MAT	ffn_norm-11	576	104448
+ffn_up-11	MUL_MAT	MUL_MAT	ffn_norm-11	576	104448
+ffn_swiglu-11	GLU	SWIGLU	ffn_up-11	0	104448
+ffn_out-11	MUL_MAT	MUL_MAT	ffn_swiglu-11	1536	39168
+l_out-11	ADD	ADD	ffn_inp-11	0	39168
+norm-12	RMS_NORM	RMS_NORM		0	39168
+attn_norm-12	MUL	MUL	blk.12.attn_norm.weight	0	39168
+Qcur-12	MUL_MAT	MUL_MAT	attn_norm-12	576	39168
+Qcur-12	RESHAPE	RESHAPE		0	39168
+Qcur-12	ROPE	ROPE	leaf_5	0	39168
+Vcur-12	MUL_MAT	MUL_MAT	attn_norm-12	576	13056
+Vcur-12	RESHAPE	RESHAPE		0	13056
+Kcur-12	MUL_MAT	MUL_MAT	attn_norm-12	576	13056
+Kcur-12	RESHAPE	RESHAPE		0	13056
+Kcur-12	ROPE	ROPE	leaf_5	0	13056
+Kcur-12 (view)	VIEW	VIEW		0	13056
+cache_k_l12 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-12 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-12 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l12 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l12 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l12 (view)	VIEW	VIEW		0	49152
+cache_v_l12 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l12 (view)	VIEW	VIEW		0	49152
+cache_k_l12 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-12 (view)	VIEW	VIEW		0	39168
+Qcur-12 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-12	MUL_MAT	MUL_MAT	Qcur-12 (view) (permuted)	64	156672
+kq_soft_max-12	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-12	MUL_MAT	MUL_MAT	kq_soft_max-12	256	39168
+kqv-12 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-12	CONT	CONT		0	39168
+attn_out-12	MUL_MAT	MUL_MAT	kqv_out-12	576	39168
+ffn_inp-12	ADD	ADD	l_out-11	0	39168
+norm-12	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-12	MUL	MUL	blk.12.ffn_norm.weight	0	39168
+ffn_gate-12	MUL_MAT	MUL_MAT	ffn_norm-12	576	104448
+ffn_up-12	MUL_MAT	MUL_MAT	ffn_norm-12	576	104448
+ffn_swiglu-12	GLU	SWIGLU	ffn_up-12	0	104448
+ffn_out-12	MUL_MAT	MUL_MAT	ffn_swiglu-12	1536	39168
+l_out-12	ADD	ADD	ffn_inp-12	0	39168
+norm-13	RMS_NORM	RMS_NORM		0	39168
+attn_norm-13	MUL	MUL	blk.13.attn_norm.weight	0	39168
+Qcur-13	MUL_MAT	MUL_MAT	attn_norm-13	576	39168
+Qcur-13	RESHAPE	RESHAPE		0	39168
+Qcur-13	ROPE	ROPE	leaf_5	0	39168
+Vcur-13	MUL_MAT	MUL_MAT	attn_norm-13	576	13056
+Vcur-13	RESHAPE	RESHAPE		0	13056
+Kcur-13	MUL_MAT	MUL_MAT	attn_norm-13	576	13056
+Kcur-13	RESHAPE	RESHAPE		0	13056
+Kcur-13	ROPE	ROPE	leaf_5	0	13056
+Kcur-13 (view)	VIEW	VIEW		0	13056
+cache_k_l13 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-13 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-13 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l13 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l13 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l13 (view)	VIEW	VIEW		0	49152
+cache_v_l13 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l13 (view)	VIEW	VIEW		0	49152
+cache_k_l13 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-13 (view)	VIEW	VIEW		0	39168
+Qcur-13 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-13	MUL_MAT	MUL_MAT	Qcur-13 (view) (permuted)	64	156672
+kq_soft_max-13	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-13	MUL_MAT	MUL_MAT	kq_soft_max-13	256	39168
+kqv-13 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-13	CONT	CONT		0	39168
+attn_out-13	MUL_MAT	MUL_MAT	kqv_out-13	576	39168
+ffn_inp-13	ADD	ADD	l_out-12	0	39168
+norm-13	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-13	MUL	MUL	blk.13.ffn_norm.weight	0	39168
+ffn_gate-13	MUL_MAT	MUL_MAT	ffn_norm-13	576	104448
+ffn_up-13	MUL_MAT	MUL_MAT	ffn_norm-13	576	104448
+ffn_swiglu-13	GLU	SWIGLU	ffn_up-13	0	104448
+ffn_out-13	MUL_MAT	MUL_MAT	ffn_swiglu-13	1536	39168
+l_out-13	ADD	ADD	ffn_inp-13	0	39168
+norm-14	RMS_NORM	RMS_NORM		0	39168
+attn_norm-14	MUL	MUL	blk.14.attn_norm.weight	0	39168
+Qcur-14	MUL_MAT	MUL_MAT	attn_norm-14	576	39168
+Qcur-14	RESHAPE	RESHAPE		0	39168
+Qcur-14	ROPE	ROPE	leaf_5	0	39168
+Vcur-14	MUL_MAT	MUL_MAT	attn_norm-14	576	13056
+Vcur-14	RESHAPE	RESHAPE		0	13056
+Kcur-14	MUL_MAT	MUL_MAT	attn_norm-14	576	13056
+Kcur-14	RESHAPE	RESHAPE		0	13056
+Kcur-14	ROPE	ROPE	leaf_5	0	13056
+Kcur-14 (view)	VIEW	VIEW		0	13056
+cache_k_l14 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-14 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-14 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l14 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l14 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l14 (view)	VIEW	VIEW		0	49152
+cache_v_l14 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l14 (view)	VIEW	VIEW		0	49152
+cache_k_l14 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-14 (view)	VIEW	VIEW		0	39168
+Qcur-14 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-14	MUL_MAT	MUL_MAT	Qcur-14 (view) (permuted)	64	156672
+kq_soft_max-14	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-14	MUL_MAT	MUL_MAT	kq_soft_max-14	256	39168
+kqv-14 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-14	CONT	CONT		0	39168
+attn_out-14	MUL_MAT	MUL_MAT	kqv_out-14	576	39168
+ffn_inp-14	ADD	ADD	l_out-13	0	39168
+norm-14	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-14	MUL	MUL	blk.14.ffn_norm.weight	0	39168
+ffn_gate-14	MUL_MAT	MUL_MAT	ffn_norm-14	576	104448
+ffn_up-14	MUL_MAT	MUL_MAT	ffn_norm-14	576	104448
+ffn_swiglu-14	GLU	SWIGLU	ffn_up-14	0	104448
+ffn_out-14	MUL_MAT	MUL_MAT	ffn_swiglu-14	1536	39168
+l_out-14	ADD	ADD	ffn_inp-14	0	39168
+norm-15	RMS_NORM	RMS_NORM		0	39168
+attn_norm-15	MUL	MUL	blk.15.attn_norm.weight	0	39168
+Qcur-15	MUL_MAT	MUL_MAT	attn_norm-15	576	39168
+Qcur-15	RESHAPE	RESHAPE		0	39168
+Qcur-15	ROPE	ROPE	leaf_5	0	39168
+Vcur-15	MUL_MAT	MUL_MAT	attn_norm-15	576	13056
+Vcur-15	RESHAPE	RESHAPE		0	13056
+Kcur-15	MUL_MAT	MUL_MAT	attn_norm-15	576	13056
+Kcur-15	RESHAPE	RESHAPE		0	13056
+Kcur-15	ROPE	ROPE	leaf_5	0	13056
+Kcur-15 (view)	VIEW	VIEW		0	13056
+cache_k_l15 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-15 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-15 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l15 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l15 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l15 (view)	VIEW	VIEW		0	49152
+cache_v_l15 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l15 (view)	VIEW	VIEW		0	49152
+cache_k_l15 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-15 (view)	VIEW	VIEW		0	39168
+Qcur-15 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-15	MUL_MAT	MUL_MAT	Qcur-15 (view) (permuted)	64	156672
+kq_soft_max-15	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-15	MUL_MAT	MUL_MAT	kq_soft_max-15	256	39168
+kqv-15 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-15	CONT	CONT		0	39168
+attn_out-15	MUL_MAT	MUL_MAT	kqv_out-15	576	39168
+ffn_inp-15	ADD	ADD	l_out-14	0	39168
+norm-15	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-15	MUL	MUL	blk.15.ffn_norm.weight	0	39168
+ffn_gate-15	MUL_MAT	MUL_MAT	ffn_norm-15	576	104448
+ffn_up-15	MUL_MAT	MUL_MAT	ffn_norm-15	576	104448
+ffn_swiglu-15	GLU	SWIGLU	ffn_up-15	0	104448
+ffn_out-15	MUL_MAT	MUL_MAT	ffn_swiglu-15	1536	39168
+l_out-15	ADD	ADD	ffn_inp-15	0	39168
+norm-16	RMS_NORM	RMS_NORM		0	39168
+attn_norm-16	MUL	MUL	blk.16.attn_norm.weight	0	39168
+Qcur-16	MUL_MAT	MUL_MAT	attn_norm-16	576	39168
+Qcur-16	RESHAPE	RESHAPE		0	39168
+Qcur-16	ROPE	ROPE	leaf_5	0	39168
+Vcur-16	MUL_MAT	MUL_MAT	attn_norm-16	576	13056
+Vcur-16	RESHAPE	RESHAPE		0	13056
+Kcur-16	MUL_MAT	MUL_MAT	attn_norm-16	576	13056
+Kcur-16	RESHAPE	RESHAPE		0	13056
+Kcur-16	ROPE	ROPE	leaf_5	0	13056
+Kcur-16 (view)	VIEW	VIEW		0	13056
+cache_k_l16 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-16 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-16 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l16 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l16 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l16 (view)	VIEW	VIEW		0	49152
+cache_v_l16 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l16 (view)	VIEW	VIEW		0	49152
+cache_k_l16 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-16 (view)	VIEW	VIEW		0	39168
+Qcur-16 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-16	MUL_MAT	MUL_MAT	Qcur-16 (view) (permuted)	64	156672
+kq_soft_max-16	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-16	MUL_MAT	MUL_MAT	kq_soft_max-16	256	39168
+kqv-16 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-16	CONT	CONT		0	39168
+attn_out-16	MUL_MAT	MUL_MAT	kqv_out-16	576	39168
+ffn_inp-16	ADD	ADD	l_out-15	0	39168
+norm-16	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-16	MUL	MUL	blk.16.ffn_norm.weight	0	39168
+ffn_gate-16	MUL_MAT	MUL_MAT	ffn_norm-16	576	104448
+ffn_up-16	MUL_MAT	MUL_MAT	ffn_norm-16	576	104448
+ffn_swiglu-16	GLU	SWIGLU	ffn_up-16	0	104448
+ffn_out-16	MUL_MAT	MUL_MAT	ffn_swiglu-16	1536	39168
+l_out-16	ADD	ADD	ffn_inp-16	0	39168
+norm-17	RMS_NORM	RMS_NORM		0	39168
+attn_norm-17	MUL	MUL	blk.17.attn_norm.weight	0	39168
+Qcur-17	MUL_MAT	MUL_MAT	attn_norm-17	576	39168
+Qcur-17	RESHAPE	RESHAPE		0	39168
+Qcur-17	ROPE	ROPE	leaf_5	0	39168
+Vcur-17	MUL_MAT	MUL_MAT	attn_norm-17	576	13056
+Vcur-17	RESHAPE	RESHAPE		0	13056
+Kcur-17	MUL_MAT	MUL_MAT	attn_norm-17	576	13056
+Kcur-17	RESHAPE	RESHAPE		0	13056
+Kcur-17	ROPE	ROPE	leaf_5	0	13056
+Kcur-17 (view)	VIEW	VIEW		0	13056
+cache_k_l17 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-17 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-17 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l17 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l17 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l17 (view)	VIEW	VIEW		0	49152
+cache_v_l17 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l17 (view)	VIEW	VIEW		0	49152
+cache_k_l17 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-17 (view)	VIEW	VIEW		0	39168
+Qcur-17 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-17	MUL_MAT	MUL_MAT	Qcur-17 (view) (permuted)	64	156672
+kq_soft_max-17	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-17	MUL_MAT	MUL_MAT	kq_soft_max-17	256	39168
+kqv-17 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-17	CONT	CONT		0	39168
+attn_out-17	MUL_MAT	MUL_MAT	kqv_out-17	576	39168
+ffn_inp-17	ADD	ADD	l_out-16	0	39168
+norm-17	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-17	MUL	MUL	blk.17.ffn_norm.weight	0	39168
+ffn_gate-17	MUL_MAT	MUL_MAT	ffn_norm-17	576	104448
+ffn_up-17	MUL_MAT	MUL_MAT	ffn_norm-17	576	104448
+ffn_swiglu-17	GLU	SWIGLU	ffn_up-17	0	104448
+ffn_out-17	MUL_MAT	MUL_MAT	ffn_swiglu-17	1536	39168
+l_out-17	ADD	ADD	ffn_inp-17	0	39168
+norm-18	RMS_NORM	RMS_NORM		0	39168
+attn_norm-18	MUL	MUL	blk.18.attn_norm.weight	0	39168
+Qcur-18	MUL_MAT	MUL_MAT	attn_norm-18	576	39168
+Qcur-18	RESHAPE	RESHAPE		0	39168
+Qcur-18	ROPE	ROPE	leaf_5	0	39168
+Vcur-18	MUL_MAT	MUL_MAT	attn_norm-18	576	13056
+Vcur-18	RESHAPE	RESHAPE		0	13056
+Kcur-18	MUL_MAT	MUL_MAT	attn_norm-18	576	13056
+Kcur-18	RESHAPE	RESHAPE		0	13056
+Kcur-18	ROPE	ROPE	leaf_5	0	13056
+Kcur-18 (view)	VIEW	VIEW		0	13056
+cache_k_l18 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-18 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-18 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l18 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l18 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l18 (view)	VIEW	VIEW		0	49152
+cache_v_l18 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l18 (view)	VIEW	VIEW		0	49152
+cache_k_l18 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-18 (view)	VIEW	VIEW		0	39168
+Qcur-18 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-18	MUL_MAT	MUL_MAT	Qcur-18 (view) (permuted)	64	156672
+kq_soft_max-18	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-18	MUL_MAT	MUL_MAT	kq_soft_max-18	256	39168
+kqv-18 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-18	CONT	CONT		0	39168
+attn_out-18	MUL_MAT	MUL_MAT	kqv_out-18	576	39168
+ffn_inp-18	ADD	ADD	l_out-17	0	39168
+norm-18	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-18	MUL	MUL	blk.18.ffn_norm.weight	0	39168
+ffn_gate-18	MUL_MAT	MUL_MAT	ffn_norm-18	576	104448
+ffn_up-18	MUL_MAT	MUL_MAT	ffn_norm-18	576	104448
+ffn_swiglu-18	GLU	SWIGLU	ffn_up-18	0	104448
+ffn_out-18	MUL_MAT	MUL_MAT	ffn_swiglu-18	1536	39168
+l_out-18	ADD	ADD	ffn_inp-18	0	39168
+norm-19	RMS_NORM	RMS_NORM		0	39168
+attn_norm-19	MUL	MUL	blk.19.attn_norm.weight	0	39168
+Qcur-19	MUL_MAT	MUL_MAT	attn_norm-19	576	39168
+Qcur-19	RESHAPE	RESHAPE		0	39168
+Qcur-19	ROPE	ROPE	leaf_5	0	39168
+Vcur-19	MUL_MAT	MUL_MAT	attn_norm-19	576	13056
+Vcur-19	RESHAPE	RESHAPE		0	13056
+Kcur-19	MUL_MAT	MUL_MAT	attn_norm-19	576	13056
+Kcur-19	RESHAPE	RESHAPE		0	13056
+Kcur-19	ROPE	ROPE	leaf_5	0	13056
+Kcur-19 (view)	VIEW	VIEW		0	13056
+cache_k_l19 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-19 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-19 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l19 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l19 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l19 (view)	VIEW	VIEW		0	49152
+cache_v_l19 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l19 (view)	VIEW	VIEW		0	49152
+cache_k_l19 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-19 (view)	VIEW	VIEW		0	39168
+Qcur-19 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-19	MUL_MAT	MUL_MAT	Qcur-19 (view) (permuted)	64	156672
+kq_soft_max-19	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-19	MUL_MAT	MUL_MAT	kq_soft_max-19	256	39168
+kqv-19 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-19	CONT	CONT		0	39168
+attn_out-19	MUL_MAT	MUL_MAT	kqv_out-19	576	39168
+ffn_inp-19	ADD	ADD	l_out-18	0	39168
+norm-19	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-19	MUL	MUL	blk.19.ffn_norm.weight	0	39168
+ffn_gate-19	MUL_MAT	MUL_MAT	ffn_norm-19	576	104448
+ffn_up-19	MUL_MAT	MUL_MAT	ffn_norm-19	576	104448
+ffn_swiglu-19	GLU	SWIGLU	ffn_up-19	0	104448
+ffn_out-19	MUL_MAT	MUL_MAT	ffn_swiglu-19	1536	39168
+l_out-19	ADD	ADD	ffn_inp-19	0	39168
+norm-20	RMS_NORM	RMS_NORM		0	39168
+attn_norm-20	MUL	MUL	blk.20.attn_norm.weight	0	39168
+Qcur-20	MUL_MAT	MUL_MAT	attn_norm-20	576	39168
+Qcur-20	RESHAPE	RESHAPE		0	39168
+Qcur-20	ROPE	ROPE	leaf_5	0	39168
+Vcur-20	MUL_MAT	MUL_MAT	attn_norm-20	576	13056
+Vcur-20	RESHAPE	RESHAPE		0	13056
+Kcur-20	MUL_MAT	MUL_MAT	attn_norm-20	576	13056
+Kcur-20	RESHAPE	RESHAPE		0	13056
+Kcur-20	ROPE	ROPE	leaf_5	0	13056
+Kcur-20 (view)	VIEW	VIEW		0	13056
+cache_k_l20 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-20 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-20 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l20 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l20 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l20 (view)	VIEW	VIEW		0	49152
+cache_v_l20 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l20 (view)	VIEW	VIEW		0	49152
+cache_k_l20 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-20 (view)	VIEW	VIEW		0	39168
+Qcur-20 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-20	MUL_MAT	MUL_MAT	Qcur-20 (view) (permuted)	64	156672
+kq_soft_max-20	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-20	MUL_MAT	MUL_MAT	kq_soft_max-20	256	39168
+kqv-20 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-20	CONT	CONT		0	39168
+attn_out-20	MUL_MAT	MUL_MAT	kqv_out-20	576	39168
+ffn_inp-20	ADD	ADD	l_out-19	0	39168
+norm-20	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-20	MUL	MUL	blk.20.ffn_norm.weight	0	39168
+ffn_gate-20	MUL_MAT	MUL_MAT	ffn_norm-20	576	104448
+ffn_up-20	MUL_MAT	MUL_MAT	ffn_norm-20	576	104448
+ffn_swiglu-20	GLU	SWIGLU	ffn_up-20	0	104448
+ffn_out-20	MUL_MAT	MUL_MAT	ffn_swiglu-20	1536	39168
+l_out-20	ADD	ADD	ffn_inp-20	0	39168
+norm-21	RMS_NORM	RMS_NORM		0	39168
+attn_norm-21	MUL	MUL	blk.21.attn_norm.weight	0	39168
+Qcur-21	MUL_MAT	MUL_MAT	attn_norm-21	576	39168
+Qcur-21	RESHAPE	RESHAPE		0	39168
+Qcur-21	ROPE	ROPE	leaf_5	0	39168
+Vcur-21	MUL_MAT	MUL_MAT	attn_norm-21	576	13056
+Vcur-21	RESHAPE	RESHAPE		0	13056
+Kcur-21	MUL_MAT	MUL_MAT	attn_norm-21	576	13056
+Kcur-21	RESHAPE	RESHAPE		0	13056
+Kcur-21	ROPE	ROPE	leaf_5	0	13056
+Kcur-21 (view)	VIEW	VIEW		0	13056
+cache_k_l21 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-21 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-21 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l21 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l21 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l21 (view)	VIEW	VIEW		0	49152
+cache_v_l21 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l21 (view)	VIEW	VIEW		0	49152
+cache_k_l21 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-21 (view)	VIEW	VIEW		0	39168
+Qcur-21 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-21	MUL_MAT	MUL_MAT	Qcur-21 (view) (permuted)	64	156672
+kq_soft_max-21	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-21	MUL_MAT	MUL_MAT	kq_soft_max-21	256	39168
+kqv-21 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-21	CONT	CONT		0	39168
+attn_out-21	MUL_MAT	MUL_MAT	kqv_out-21	576	39168
+ffn_inp-21	ADD	ADD	l_out-20	0	39168
+norm-21	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-21	MUL	MUL	blk.21.ffn_norm.weight	0	39168
+ffn_gate-21	MUL_MAT	MUL_MAT	ffn_norm-21	576	104448
+ffn_up-21	MUL_MAT	MUL_MAT	ffn_norm-21	576	104448
+ffn_swiglu-21	GLU	SWIGLU	ffn_up-21	0	104448
+ffn_out-21	MUL_MAT	MUL_MAT	ffn_swiglu-21	1536	39168
+l_out-21	ADD	ADD	ffn_inp-21	0	39168
+norm-22	RMS_NORM	RMS_NORM		0	39168
+attn_norm-22	MUL	MUL	blk.22.attn_norm.weight	0	39168
+Qcur-22	MUL_MAT	MUL_MAT	attn_norm-22	576	39168
+Qcur-22	RESHAPE	RESHAPE		0	39168
+Qcur-22	ROPE	ROPE	leaf_5	0	39168
+Vcur-22	MUL_MAT	MUL_MAT	attn_norm-22	576	13056
+Vcur-22	RESHAPE	RESHAPE		0	13056
+Kcur-22	MUL_MAT	MUL_MAT	attn_norm-22	576	13056
+Kcur-22	RESHAPE	RESHAPE		0	13056
+Kcur-22	ROPE	ROPE	leaf_5	0	13056
+Kcur-22 (view)	VIEW	VIEW		0	13056
+cache_k_l22 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-22 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-22 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l22 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l22 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l22 (view)	VIEW	VIEW		0	49152
+cache_v_l22 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l22 (view)	VIEW	VIEW		0	49152
+cache_k_l22 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-22 (view)	VIEW	VIEW		0	39168
+Qcur-22 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-22	MUL_MAT	MUL_MAT	Qcur-22 (view) (permuted)	64	156672
+kq_soft_max-22	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-22	MUL_MAT	MUL_MAT	kq_soft_max-22	256	39168
+kqv-22 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-22	CONT	CONT		0	39168
+attn_out-22	MUL_MAT	MUL_MAT	kqv_out-22	576	39168
+ffn_inp-22	ADD	ADD	l_out-21	0	39168
+norm-22	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-22	MUL	MUL	blk.22.ffn_norm.weight	0	39168
+ffn_gate-22	MUL_MAT	MUL_MAT	ffn_norm-22	576	104448
+ffn_up-22	MUL_MAT	MUL_MAT	ffn_norm-22	576	104448
+ffn_swiglu-22	GLU	SWIGLU	ffn_up-22	0	104448
+ffn_out-22	MUL_MAT	MUL_MAT	ffn_swiglu-22	1536	39168
+l_out-22	ADD	ADD	ffn_inp-22	0	39168
+norm-23	RMS_NORM	RMS_NORM		0	39168
+attn_norm-23	MUL	MUL	blk.23.attn_norm.weight	0	39168
+Qcur-23	MUL_MAT	MUL_MAT	attn_norm-23	576	39168
+Qcur-23	RESHAPE	RESHAPE		0	39168
+Qcur-23	ROPE	ROPE	leaf_5	0	39168
+Vcur-23	MUL_MAT	MUL_MAT	attn_norm-23	576	13056
+Vcur-23	RESHAPE	RESHAPE		0	13056
+Kcur-23	MUL_MAT	MUL_MAT	attn_norm-23	576	13056
+Kcur-23	RESHAPE	RESHAPE		0	13056
+Kcur-23	ROPE	ROPE	leaf_5	0	13056
+Kcur-23 (view)	VIEW	VIEW		0	13056
+cache_k_l23 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-23 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-23 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l23 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l23 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l23 (view)	VIEW	VIEW		0	49152
+cache_v_l23 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l23 (view)	VIEW	VIEW		0	49152
+cache_k_l23 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-23 (view)	VIEW	VIEW		0	39168
+Qcur-23 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-23	MUL_MAT	MUL_MAT	Qcur-23 (view) (permuted)	64	156672
+kq_soft_max-23	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-23	MUL_MAT	MUL_MAT	kq_soft_max-23	256	39168
+kqv-23 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-23	CONT	CONT		0	39168
+attn_out-23	MUL_MAT	MUL_MAT	kqv_out-23	576	39168
+ffn_inp-23	ADD	ADD	l_out-22	0	39168
+norm-23	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-23	MUL	MUL	blk.23.ffn_norm.weight	0	39168
+ffn_gate-23	MUL_MAT	MUL_MAT	ffn_norm-23	576	104448
+ffn_up-23	MUL_MAT	MUL_MAT	ffn_norm-23	576	104448
+ffn_swiglu-23	GLU	SWIGLU	ffn_up-23	0	104448
+ffn_out-23	MUL_MAT	MUL_MAT	ffn_swiglu-23	1536	39168
+l_out-23	ADD	ADD	ffn_inp-23	0	39168
+norm-24	RMS_NORM	RMS_NORM		0	39168
+attn_norm-24	MUL	MUL	blk.24.attn_norm.weight	0	39168
+Qcur-24	MUL_MAT	MUL_MAT	attn_norm-24	576	39168
+Qcur-24	RESHAPE	RESHAPE		0	39168
+Qcur-24	ROPE	ROPE	leaf_5	0	39168
+Vcur-24	MUL_MAT	MUL_MAT	attn_norm-24	576	13056
+Vcur-24	RESHAPE	RESHAPE		0	13056
+Kcur-24	MUL_MAT	MUL_MAT	attn_norm-24	576	13056
+Kcur-24	RESHAPE	RESHAPE		0	13056
+Kcur-24	ROPE	ROPE	leaf_5	0	13056
+Kcur-24 (view)	VIEW	VIEW		0	13056
+cache_k_l24 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-24 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-24 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l24 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l24 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l24 (view)	VIEW	VIEW		0	49152
+cache_v_l24 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l24 (view)	VIEW	VIEW		0	49152
+cache_k_l24 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-24 (view)	VIEW	VIEW		0	39168
+Qcur-24 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-24	MUL_MAT	MUL_MAT	Qcur-24 (view) (permuted)	64	156672
+kq_soft_max-24	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-24	MUL_MAT	MUL_MAT	kq_soft_max-24	256	39168
+kqv-24 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-24	CONT	CONT		0	39168
+attn_out-24	MUL_MAT	MUL_MAT	kqv_out-24	576	39168
+ffn_inp-24	ADD	ADD	l_out-23	0	39168
+norm-24	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-24	MUL	MUL	blk.24.ffn_norm.weight	0	39168
+ffn_gate-24	MUL_MAT	MUL_MAT	ffn_norm-24	576	104448
+ffn_up-24	MUL_MAT	MUL_MAT	ffn_norm-24	576	104448
+ffn_swiglu-24	GLU	SWIGLU	ffn_up-24	0	104448
+ffn_out-24	MUL_MAT	MUL_MAT	ffn_swiglu-24	1536	39168
+l_out-24	ADD	ADD	ffn_inp-24	0	39168
+norm-25	RMS_NORM	RMS_NORM		0	39168
+attn_norm-25	MUL	MUL	blk.25.attn_norm.weight	0	39168
+Qcur-25	MUL_MAT	MUL_MAT	attn_norm-25	576	39168
+Qcur-25	RESHAPE	RESHAPE		0	39168
+Qcur-25	ROPE	ROPE	leaf_5	0	39168
+Vcur-25	MUL_MAT	MUL_MAT	attn_norm-25	576	13056
+Vcur-25	RESHAPE	RESHAPE		0	13056
+Kcur-25	MUL_MAT	MUL_MAT	attn_norm-25	576	13056
+Kcur-25	RESHAPE	RESHAPE		0	13056
+Kcur-25	ROPE	ROPE	leaf_5	0	13056
+Kcur-25 (view)	VIEW	VIEW		0	13056
+cache_k_l25 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-25 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-25 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l25 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l25 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l25 (view)	VIEW	VIEW		0	49152
+cache_v_l25 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l25 (view)	VIEW	VIEW		0	49152
+cache_k_l25 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-25 (view)	VIEW	VIEW		0	39168
+Qcur-25 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-25	MUL_MAT	MUL_MAT	Qcur-25 (view) (permuted)	64	156672
+kq_soft_max-25	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-25	MUL_MAT	MUL_MAT	kq_soft_max-25	256	39168
+kqv-25 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-25	CONT	CONT		0	39168
+attn_out-25	MUL_MAT	MUL_MAT	kqv_out-25	576	39168
+ffn_inp-25	ADD	ADD	l_out-24	0	39168
+norm-25	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-25	MUL	MUL	blk.25.ffn_norm.weight	0	39168
+ffn_gate-25	MUL_MAT	MUL_MAT	ffn_norm-25	576	104448
+ffn_up-25	MUL_MAT	MUL_MAT	ffn_norm-25	576	104448
+ffn_swiglu-25	GLU	SWIGLU	ffn_up-25	0	104448
+ffn_out-25	MUL_MAT	MUL_MAT	ffn_swiglu-25	1536	39168
+l_out-25	ADD	ADD	ffn_inp-25	0	39168
+norm-26	RMS_NORM	RMS_NORM		0	39168
+attn_norm-26	MUL	MUL	blk.26.attn_norm.weight	0	39168
+Qcur-26	MUL_MAT	MUL_MAT	attn_norm-26	576	39168
+Qcur-26	RESHAPE	RESHAPE		0	39168
+Qcur-26	ROPE	ROPE	leaf_5	0	39168
+Vcur-26	MUL_MAT	MUL_MAT	attn_norm-26	576	13056
+Vcur-26	RESHAPE	RESHAPE		0	13056
+Kcur-26	MUL_MAT	MUL_MAT	attn_norm-26	576	13056
+Kcur-26	RESHAPE	RESHAPE		0	13056
+Kcur-26	ROPE	ROPE	leaf_5	0	13056
+Kcur-26 (view)	VIEW	VIEW		0	13056
+cache_k_l26 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-26 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-26 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l26 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l26 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l26 (view)	VIEW	VIEW		0	49152
+cache_v_l26 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l26 (view)	VIEW	VIEW		0	49152
+cache_k_l26 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-26 (view)	VIEW	VIEW		0	39168
+Qcur-26 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-26	MUL_MAT	MUL_MAT	Qcur-26 (view) (permuted)	64	156672
+kq_soft_max-26	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-26	MUL_MAT	MUL_MAT	kq_soft_max-26	256	39168
+kqv-26 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-26	CONT	CONT		0	39168
+attn_out-26	MUL_MAT	MUL_MAT	kqv_out-26	576	39168
+ffn_inp-26	ADD	ADD	l_out-25	0	39168
+norm-26	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-26	MUL	MUL	blk.26.ffn_norm.weight	0	39168
+ffn_gate-26	MUL_MAT	MUL_MAT	ffn_norm-26	576	104448
+ffn_up-26	MUL_MAT	MUL_MAT	ffn_norm-26	576	104448
+ffn_swiglu-26	GLU	SWIGLU	ffn_up-26	0	104448
+ffn_out-26	MUL_MAT	MUL_MAT	ffn_swiglu-26	1536	39168
+l_out-26	ADD	ADD	ffn_inp-26	0	39168
+norm-27	RMS_NORM	RMS_NORM		0	39168
+attn_norm-27	MUL	MUL	blk.27.attn_norm.weight	0	39168
+Qcur-27	MUL_MAT	MUL_MAT	attn_norm-27	576	39168
+Qcur-27	RESHAPE	RESHAPE		0	39168
+Qcur-27	ROPE	ROPE	leaf_5	0	39168
+Vcur-27	MUL_MAT	MUL_MAT	attn_norm-27	576	13056
+Vcur-27	RESHAPE	RESHAPE		0	13056
+Kcur-27	MUL_MAT	MUL_MAT	attn_norm-27	576	13056
+Kcur-27	RESHAPE	RESHAPE		0	13056
+Kcur-27	ROPE	ROPE	leaf_5	0	13056
+Kcur-27 (view)	VIEW	VIEW		0	13056
+cache_k_l27 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-27 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-27 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l27 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l27 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l27 (view)	VIEW	VIEW		0	49152
+cache_v_l27 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l27 (view)	VIEW	VIEW		0	49152
+cache_k_l27 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-27 (view)	VIEW	VIEW		0	39168
+Qcur-27 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-27	MUL_MAT	MUL_MAT	Qcur-27 (view) (permuted)	64	156672
+kq_soft_max-27	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-27	MUL_MAT	MUL_MAT	kq_soft_max-27	256	39168
+kqv-27 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-27	CONT	CONT		0	39168
+attn_out-27	MUL_MAT	MUL_MAT	kqv_out-27	576	39168
+ffn_inp-27	ADD	ADD	l_out-26	0	39168
+norm-27	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-27	MUL	MUL	blk.27.ffn_norm.weight	0	39168
+ffn_gate-27	MUL_MAT	MUL_MAT	ffn_norm-27	576	104448
+ffn_up-27	MUL_MAT	MUL_MAT	ffn_norm-27	576	104448
+ffn_swiglu-27	GLU	SWIGLU	ffn_up-27	0	104448
+ffn_out-27	MUL_MAT	MUL_MAT	ffn_swiglu-27	1536	39168
+l_out-27	ADD	ADD	ffn_inp-27	0	39168
+norm-28	RMS_NORM	RMS_NORM		0	39168
+attn_norm-28	MUL	MUL	blk.28.attn_norm.weight	0	39168
+Qcur-28	MUL_MAT	MUL_MAT	attn_norm-28	576	39168
+Qcur-28	RESHAPE	RESHAPE		0	39168
+Qcur-28	ROPE	ROPE	leaf_5	0	39168
+Vcur-28	MUL_MAT	MUL_MAT	attn_norm-28	576	13056
+Vcur-28	RESHAPE	RESHAPE		0	13056
+Kcur-28	MUL_MAT	MUL_MAT	attn_norm-28	576	13056
+Kcur-28	RESHAPE	RESHAPE		0	13056
+Kcur-28	ROPE	ROPE	leaf_5	0	13056
+Kcur-28 (view)	VIEW	VIEW		0	13056
+cache_k_l28 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-28 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-28 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l28 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l28 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l28 (view)	VIEW	VIEW		0	49152
+cache_v_l28 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l28 (view)	VIEW	VIEW		0	49152
+cache_k_l28 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-28 (view)	VIEW	VIEW		0	39168
+Qcur-28 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-28	MUL_MAT	MUL_MAT	Qcur-28 (view) (permuted)	64	156672
+kq_soft_max-28	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-28	MUL_MAT	MUL_MAT	kq_soft_max-28	256	39168
+kqv-28 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-28	CONT	CONT		0	39168
+attn_out-28	MUL_MAT	MUL_MAT	kqv_out-28	576	39168
+ffn_inp-28	ADD	ADD	l_out-27	0	39168
+norm-28	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-28	MUL	MUL	blk.28.ffn_norm.weight	0	39168
+ffn_gate-28	MUL_MAT	MUL_MAT	ffn_norm-28	576	104448
+ffn_up-28	MUL_MAT	MUL_MAT	ffn_norm-28	576	104448
+ffn_swiglu-28	GLU	SWIGLU	ffn_up-28	0	104448
+ffn_out-28	MUL_MAT	MUL_MAT	ffn_swiglu-28	1536	39168
+l_out-28	ADD	ADD	ffn_inp-28	0	39168
+norm-29	RMS_NORM	RMS_NORM		0	39168
+attn_norm-29	MUL	MUL	blk.29.attn_norm.weight	0	39168
+Qcur-29	MUL_MAT	MUL_MAT	attn_norm-29	576	39168
+Qcur-29	RESHAPE	RESHAPE		0	39168
+Qcur-29	ROPE	ROPE	leaf_5	0	39168
+Vcur-29	MUL_MAT	MUL_MAT	attn_norm-29	576	13056
+Vcur-29	RESHAPE	RESHAPE		0	13056
+Kcur-29	MUL_MAT	MUL_MAT	attn_norm-29	576	13056
+Kcur-29	RESHAPE	RESHAPE		0	13056
+Kcur-29	ROPE	ROPE	leaf_5	0	13056
+Kcur-29 (view)	VIEW	VIEW		0	13056
+cache_k_l29 (view)	SET_ROWS	SET_ROWS	leaf_8	0	196608
+Vcur-29 (reshaped)	RESHAPE	RESHAPE		0	13056
+Vcur-29 (reshaped) (reshaped)	RESHAPE	RESHAPE		0	13056
+cache_v_l29 (reshaped)	RESHAPE	RESHAPE		0	196608
+cache_v_l29 (reshaped) (view)	SET_ROWS	SET_ROWS	leaf_10	0	196608
+cache_v_l29 (view)	VIEW	VIEW		0	49152
+cache_v_l29 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+cache_k_l29 (view)	VIEW	VIEW		0	49152
+cache_k_l29 (view) (permuted)	PERMUTE	PERMUTE		0	49152
+Qcur-29 (view)	VIEW	VIEW		0	39168
+Qcur-29 (view) (permuted)	PERMUTE	PERMUTE		0	39168
+kq-29	MUL_MAT	MUL_MAT	Qcur-29 (view) (permuted)	64	156672
+kq_soft_max-29	SOFT_MAX	SOFT_MAX	attn_inp_kq_mask	0	156672
+kqv-29	MUL_MAT	MUL_MAT	kq_soft_max-29	256	39168
+kqv-29 (permuted)	PERMUTE	PERMUTE		0	39168
+kqv_out-29	CONT	CONT		0	39168
+attn_out-29	MUL_MAT	MUL_MAT	kqv_out-29	576	39168
+node_1073	GET_ROWS	GET_ROWS	leaf_335	0	39168
+node_1074	GET_ROWS	GET_ROWS	leaf_335	0	39168
+ffn_inp-29	ADD	ADD	node_1074	0	39168
+norm-29	RMS_NORM	RMS_NORM		0	39168
+ffn_norm-29	MUL	MUL	blk.29.ffn_norm.weight	0	39168
+ffn_gate-29	MUL_MAT	MUL_MAT	ffn_norm-29	576	104448
+ffn_up-29	MUL_MAT	MUL_MAT	ffn_norm-29	576	104448
+ffn_swiglu-29	GLU	SWIGLU	ffn_up-29	0	104448
+ffn_out-29	MUL_MAT	MUL_MAT	ffn_swiglu-29	1536	39168
+l_out-29	ADD	ADD	ffn_inp-29	0	39168
+norm	RMS_NORM	RMS_NORM		0	39168
+result_norm	MUL	MUL	output_norm.weight	0	39168
+result_output	MUL_MAT	MUL_MAT	result_norm	576	3342336

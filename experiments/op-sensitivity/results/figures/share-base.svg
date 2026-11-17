@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 596" width="760" height="596" role="img">
+<title>Share of the all-base KL caused by one group alone</title><desc>KL with only that group in LNS (base mode), as % of the KL with every op in LNS</desc>
+<style>svg{--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--s0:#2a78d6;--s1:#eb6834;--s2:#1baf7a;--s3:#eda100;--s4:#e87ba4;--s5:#008300;--s6:#6250d6;--s7:#e34948}@media (prefers-color-scheme: dark){svg{--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--s0:#3987e5;--s1:#d95926;--s2:#199e70;--s3:#c98500;--s4:#d55181;--s5:#0ca30c;--s6:#9085e9;--s7:#e66767}}text{font-family:system-ui, -apple-system, "Segoe UI", sans-serif;fill:var(--ink2);font-size:12px}.title{fill:var(--ink);font-size:15px;font-weight:600}.sub{fill:var(--ink2);font-size:12px}.tick{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}.lab{fill:var(--ink2);font-size:12px}.grid{stroke:var(--grid);stroke-width:1}.axis{stroke:var(--axis);stroke-width:1}.ref{stroke:var(--muted);stroke-width:1}.l0{stroke:var(--s0);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f0{fill:var(--s0)}.l1{stroke:var(--s1);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f1{fill:var(--s1)}.l2{stroke:var(--s2);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f2{fill:var(--s2)}.l3{stroke:var(--s3);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f3{fill:var(--s3)}.l4{stroke:var(--s4);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f4{fill:var(--s4)}.l5{stroke:var(--s5);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f5{fill:var(--s5)}.l6{stroke:var(--s6);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f6{fill:var(--s6)}.l7{stroke:var(--s7);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f7{fill:var(--s7)}</style>
+<rect width="760" height="596" rx="8" style="fill:var(--surface)"/>
+<text class="title" x="76" y="28">Share of the all-base KL caused by one group alone</text>
+<text class="sub" x="76" y="48">KL with only that group in LNS (base mode), as % of the KL with every op in LNS</text>
+<rect class="f5" x="76" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="94" y="72">Qwen2.5-0.5B</text>
+<rect class="f6" x="203" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="221" y="72">SmolLM2-135M</text>
+<line class="grid" x1="146.0" y1="92" x2="146.0" y2="540"/>
+<text class="tick" x="146.0" y="558" text-anchor="middle">0</text>
+<line class="grid" x1="298.4" y1="92" x2="298.4" y2="540"/>
+<text class="tick" x="298.4" y="558" text-anchor="middle">10</text>
+<line class="grid" x1="450.8" y1="92" x2="450.8" y2="540"/>
+<text class="tick" x="450.8" y="558" text-anchor="middle">20</text>
+<line class="grid" x1="603.3" y1="92" x2="603.3" y2="540"/>
+<text class="tick" x="603.3" y="558" text-anchor="middle">30</text>
+<text class="lab" x="441.0" y="584" text-anchor="middle">% of the all-base KL</text>
+<text class="lab" x="138" y="112.0" text-anchor="end">qkv_proj</text>
+<path class="f5" d="M146.0,96.0 H218.6 Q222.6,96.0 222.6,100.0 V102.0 Q222.6,106.0 218.6,106.0 H146.0 Z"/>
+<path class="f6" d="M146.0,108.0 H209.4 Q213.4,108.0 213.4,112.0 V114.0 Q213.4,118.0 209.4,118.0 H146.0 Z"/>
+<text class="lab" x="138" y="144.0" text-anchor="end">qkv_bias</text>
+<path class="f5" d="M146.0,128.0 H154.0 Q158.0,128.0 158.0,132.0 V134.0 Q158.0,138.0 154.0,138.0 H146.0 Z"/>
+<text class="lab" x="138" y="176.0" text-anchor="end">rope</text>
+<path class="f5" d="M146.0,160.0 H153.9 Q157.9,160.0 157.9,164.0 V166.0 Q157.9,170.0 153.9,170.0 H146.0 Z"/>
+<path class="f6" d="M146.0,172.0 H168.8 Q172.8,172.0 172.8,176.0 V178.0 Q172.8,182.0 168.8,182.0 H146.0 Z"/>
+<text class="lab" x="138" y="208.0" text-anchor="end">kq</text>
+<path class="f5" d="M146.0,192.0 H188.2 Q192.2,192.0 192.2,196.0 V198.0 Q192.2,202.0 188.2,202.0 H146.0 Z"/>
+<path class="f6" d="M146.0,204.0 H177.9 Q181.9,204.0 181.9,208.0 V210.0 Q181.9,214.0 177.9,214.0 H146.0 Z"/>
+<text class="lab" x="138" y="240.0" text-anchor="end">softmax</text>
+<path class="f5" d="M146.0,224.0 H155.9 Q159.9,224.0 159.9,228.0 V230.0 Q159.9,234.0 155.9,234.0 H146.0 Z"/>
+<path class="f6" d="M146.0,236.0 H171.5 Q175.5,236.0 175.5,240.0 V242.0 Q175.5,246.0 171.5,246.0 H146.0 Z"/>
+<text class="lab" x="138" y="272.0" text-anchor="end">kqv</text>
+<path class="f5" d="M146.0,256.0 H151.9 Q155.9,256.0 155.9,260.0 V262.0 Q155.9,266.0 151.9,266.0 H146.0 Z"/>
+<path class="f6" d="M146.0,268.0 H170.7 Q174.7,268.0 174.7,272.0 V274.0 Q174.7,278.0 170.7,278.0 H146.0 Z"/>
+<text class="lab" x="138" y="304.0" text-anchor="end">attn_out</text>
+<path class="f5" d="M146.0,288.0 H155.5 Q159.5,288.0 159.5,292.0 V294.0 Q159.5,298.0 155.5,298.0 H146.0 Z"/>
+<path class="f6" d="M146.0,300.0 H176.9 Q180.9,300.0 180.9,304.0 V306.0 Q180.9,310.0 176.9,310.0 H146.0 Z"/>
+<text class="lab" x="138" y="336.0" text-anchor="end">ffn_gate_up</text>
+<path class="f5" d="M146.0,320.0 H324.3 Q328.3,320.0 328.3,324.0 V326.0 Q328.3,330.0 324.3,330.0 H146.0 Z"/>
+<path class="f6" d="M146.0,332.0 H212.9 Q216.9,332.0 216.9,336.0 V338.0 Q216.9,342.0 212.9,342.0 H146.0 Z"/>
+<text class="lab" x="138" y="368.0" text-anchor="end">swiglu</text>
+<path class="f5" d="M146.0,352.0 H153.0 Q157.0,352.0 157.0,356.0 V358.0 Q157.0,362.0 153.0,362.0 H146.0 Z"/>
+<path class="f6" d="M146.0,364.0 H172.6 Q176.6,364.0 176.6,368.0 V370.0 Q176.6,374.0 172.6,374.0 H146.0 Z"/>
+<text class="lab" x="138" y="400.0" text-anchor="end">ffn_down</text>
+<path class="f5" d="M146.0,384.0 H258.0 Q262.0,384.0 262.0,388.0 V390.0 Q262.0,394.0 258.0,394.0 H146.0 Z"/>
+<path class="f6" d="M146.0,396.0 H226.6 Q230.6,396.0 230.6,400.0 V402.0 Q230.6,406.0 226.6,406.0 H146.0 Z"/>
+<text class="lab" x="138" y="432.0" text-anchor="end">rms_norm</text>
+<path class="f5" d="M146.0,416.0 H495.4 Q499.4,416.0 499.4,420.0 V422.0 Q499.4,426.0 495.4,426.0 H146.0 Z"/>
+<path class="f6" d="M146.0,428.0 H518.3 Q522.3,428.0 522.3,432.0 V434.0 Q522.3,438.0 518.3,438.0 H146.0 Z"/>
+<text class="lab" x="138" y="464.0" text-anchor="end">norm_scale</text>
+<path class="f5" d="M146.0,448.0 H157.8 Q161.8,448.0 161.8,452.0 V454.0 Q161.8,458.0 157.8,458.0 H146.0 Z"/>
+<path class="f6" d="M146.0,460.0 H172.1 Q176.1,460.0 176.1,464.0 V466.0 Q176.1,470.0 172.1,470.0 H146.0 Z"/>
+<text class="lab" x="138" y="496.0" text-anchor="end">residual</text>
+<path class="f5" d="M146.0,480.0 H696.3 Q700.3,480.0 700.3,484.0 V486.0 Q700.3,490.0 696.3,490.0 H146.0 Z"/>
+<path class="f6" d="M146.0,492.0 H489.5 Q493.5,492.0 493.5,496.0 V498.0 Q493.5,502.0 489.5,502.0 H146.0 Z"/>
+<text class="lab" x="138" y="528.0" text-anchor="end">lm_head</text>
+<path class="f5" d="M146.0,512.0 H308.2 Q312.2,512.0 312.2,516.0 V518.0 Q312.2,522.0 308.2,522.0 H146.0 Z"/>
+<path class="f6" d="M146.0,524.0 H494.5 Q498.5,524.0 498.5,528.0 V530.0 Q498.5,534.0 494.5,534.0 H146.0 Z"/>
+<line class="axis" x1="146.0" y1="92" x2="146.0" y2="540"/>
+</svg>

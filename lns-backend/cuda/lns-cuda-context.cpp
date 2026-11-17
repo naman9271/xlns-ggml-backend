@@ -1,5 +1,7 @@
 #include "lns-cuda-context.h"
 
+#include "lns-backend-config.h"
+
 #include "ggml-backend.h"
 #include "ggml-impl.h"
 
@@ -216,7 +218,55 @@ static bool is_weight(const ggml_tensor * t) {
 // context
 // ============================================================
 
-context::context(const kernel_set & kernels, const char * backend_name) : arith(kernels), name(backend_name) {}
+static const kernel_set * xlns16_kernels_by_mode(const std::string & mode) {
+#ifdef GGML_LNSCUDA16_MIXED
+    if (mode == "base")  return &xlns16_kernels_base();
+    if (mode == "lpvip") return &xlns16_kernels_lpvip();
+    if (mode == "sum32") return &xlns16_kernels_sum32();
+#endif
+    if (xlns16_kernels().sum_mode() != nullptr && mode == xlns16_kernels().sum_mode()) {
+        return &xlns16_kernels();
+    }
+    return nullptr;
+}
+
+context::context(const kernel_set & kernels, const char * backend_name) : arith(kernels), name(backend_name) {
+    const char * env = std::getenv("LNS16_SUM_POLICY");
+    if (env == nullptr || arith.sum_mode() == nullptr) {
+        return;
+    }
+    for (const std::string & rule : lns::split_list(env)) {
+        const size_t eq = rule.rfind('=');
+        if (eq == std::string::npos) {
+            GGML_ABORT("ggml-lns-cuda: LNS16_SUM_POLICY rule '%s' is not selector=mode", rule.c_str());
+        }
+        const std::string mode = rule.substr(eq + 1);
+        const kernel_set * k = xlns16_kernels_by_mode(mode);
+        if (k == nullptr) {
+            GGML_ABORT("ggml-lns-cuda: LNS16_SUM_POLICY mode '%s' is not built (base|lpvip|sum32 need "
+                       "GGML_LNSCUDA16_MIXED=ON; monte only as the build's own mode)", mode.c_str());
+        }
+        sum_policy.emplace_back(rule.substr(0, eq), k);
+    }
+    std::fprintf(stderr, "ggml-lns-cuda: %s LNS16_SUM_POLICY with %zu rules (default sum=%s)\n",
+                 name.c_str(), sum_policy.size(), arith.sum_mode());
+}
+
+const kernel_set & context::kernels_for(const ggml_tensor * node) {
+    const kernel_set * k = &arith;
+    for (const auto & rule : sum_policy) {
+        if (lns::op_matches(node, rule.first)) {
+            k = rule.second;
+            break;
+        }
+    }
+    stream();
+    if (k != &arith && std::find(tables_uploaded.begin(), tables_uploaded.end(), k) == tables_uploaded.end()) {
+        LNS_CUDA_CHECK(k->upload_tables());
+        tables_uploaded.push_back(k);
+    }
+    return *k;
+}
 
 context::~context() {
     if (device < 0) {

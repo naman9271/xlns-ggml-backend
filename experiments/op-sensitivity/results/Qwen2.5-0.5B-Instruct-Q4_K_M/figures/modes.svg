@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" role="img">
+<title>Qwen2.5-0.5B: every op in LNS</title><desc>KL divergence from the F32 reference (nats, log scale)</desc>
+<style>svg{--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--s0:#2a78d6;--s1:#eb6834;--s2:#1baf7a;--s3:#eda100;--s4:#e87ba4;--s5:#008300;--s6:#6250d6;--s7:#e34948}@media (prefers-color-scheme: dark){svg{--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--s0:#3987e5;--s1:#d95926;--s2:#199e70;--s3:#c98500;--s4:#d55181;--s5:#0ca30c;--s6:#9085e9;--s7:#e66767}}text{font-family:system-ui, -apple-system, "Segoe UI", sans-serif;fill:var(--ink2);font-size:12px}.title{fill:var(--ink);font-size:15px;font-weight:600}.sub{fill:var(--ink2);font-size:12px}.tick{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}.lab{fill:var(--ink2);font-size:12px}.grid{stroke:var(--grid);stroke-width:1}.axis{stroke:var(--axis);stroke-width:1}.ref{stroke:var(--muted);stroke-width:1}.l0{stroke:var(--s0);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f0{fill:var(--s0)}.l1{stroke:var(--s1);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f1{fill:var(--s1)}.l2{stroke:var(--s2);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f2{fill:var(--s2)}.l3{stroke:var(--s3);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f3{fill:var(--s3)}.l4{stroke:var(--s4);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f4{fill:var(--s4)}.l5{stroke:var(--s5);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f5{fill:var(--s5)}.l6{stroke:var(--s6);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f6{fill:var(--s6)}.l7{stroke:var(--s7);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f7{fill:var(--s7)}</style>
+<rect width="760" height="440" rx="8" style="fill:var(--surface)"/>
+<text class="title" x="76" y="28">Qwen2.5-0.5B: every op in LNS</text>
+<text class="sub" x="76" y="48">KL divergence from the F32 reference (nats, log scale)</text>
+<rect class="f0" x="76" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="94" y="72">base</text>
+<rect class="f1" x="147" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="165" y="72">monte</text>
+<rect class="f2" x="225" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="243" y="72">lpvip</text>
+<rect class="f3" x="303" y="62" width="12" height="12" rx="3"/>
+<text class="lab" x="321" y="72">sum32</text>
+<line class="grid" x1="146.0" y1="92" x2="146.0" y2="384"/>
+<text class="tick" x="146.0" y="402" text-anchor="middle">0.1</text>
+<line class="grid" x1="437.0" y1="92" x2="437.0" y2="384"/>
+<text class="tick" x="437.0" y="402" text-anchor="middle">1</text>
+<line class="grid" x1="728.0" y1="92" x2="728.0" y2="384"/>
+<text class="tick" x="728.0" y="402" text-anchor="middle">10</text>
+<text class="lab" x="441.0" y="428" text-anchor="middle">KL (nats)</text>
+<text class="lab" x="138" y="242.0" text-anchor="end">all ops in LNS</text>
+<path class="f0" d="M146.0,186.0 H340.0 Q344.0,186.0 344.0,190.0 V206.0 Q344.0,210.0 340.0,210.0 H146.0 Z"/>
+<text class="lab" x="350.0" y="202.0" text-anchor="start">0.479</text>
+<path class="f1" d="M146.0,212.0 H281.7 Q285.7,212.0 285.7,216.0 V232.0 Q285.7,236.0 281.7,236.0 H146.0 Z"/>
+<text class="lab" x="291.7" y="228.0" text-anchor="start">0.302</text>
+<path class="f2" d="M146.0,238.0 H635.4 Q639.4,238.0 639.4,242.0 V258.0 Q639.4,262.0 635.4,262.0 H146.0 Z"/>
+<text class="lab" x="645.4" y="254.0" text-anchor="start">4.96</text>
+<path class="f3" d="M146.0,264.0 H207.2 Q211.2,264.0 211.2,268.0 V284.0 Q211.2,288.0 207.2,288.0 H146.0 Z"/>
+<text class="lab" x="217.2" y="280.0" text-anchor="start">0.168</text>
+<line class="axis" x1="146.0" y1="92" x2="146.0" y2="384"/>
+</svg>

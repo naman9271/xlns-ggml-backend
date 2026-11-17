@@ -71,6 +71,14 @@ if (LNS_CUDA16_MODE_DEFS)
     set_property(SOURCE lns-cuda-xlns16.cu APPEND PROPERTY COMPILE_DEFINITIONS ${LNS_CUDA16_MODE_DEFS})
 endif()
 
+option(GGML_LNSCUDA16_MIXED "LNSCUDA16: also build base/lpvip/sum32 reductions for LNS16_SUM_POLICY" OFF)
+if (GGML_LNSCUDA16_MIXED)
+    target_sources(ggml-lnscuda PRIVATE lns-cuda-xlns16-base.cu lns-cuda-xlns16-lpvip.cu lns-cuda-xlns16-sum32.cu)
+    set_property(SOURCE lns-cuda-xlns16-lpvip.cu APPEND PROPERTY COMPILE_DEFINITIONS GGML_LNS16_SUM_LPVIP)
+    set_property(SOURCE lns-cuda-xlns16-sum32.cu APPEND PROPERTY COMPILE_DEFINITIONS GGML_LNS16_SUM_SUM32 xlns32_alt)
+    target_compile_definitions(ggml-lnscuda PRIVATE GGML_LNSCUDA16_MIXED)
+endif()
+
 # LNS16 owns the Monte random state that LNSCUDA16 draws from (ggml-lns.h).
 if (GGML_LNS)
     target_link_libraries(ggml-lnscuda PRIVATE ggml-lns)

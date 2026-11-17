@@ -288,7 +288,17 @@ Debug/bisection knobs (LNS16 and LNS32; `LNS_MM_ROUNDTRIP` is LNS16-only):
 
 - `LNS_DISABLE_OPS="ADD,ROPE,..."` — force listed ops (by ggml op name, or by
   substring of the tensor name, e.g. `ffn_down`, `result_output`; substrings
-  are case-sensitive) to fall back to CPU. No rebuild needed.
+  are case-sensitive) to fall back to CPU. No rebuild needed. A token may be
+  limited to one op (`MUL_MAT:kq-*`), match the name of the op's second input
+  instead (`MUL_MAT:<kqv_out-*`), and use `*?[]` wildcards, which then match
+  the whole name (`*-5` is layer 5 only, not layer 15).
+- `LNS_ENABLE_OPS="..."` — the opposite: only ops matching a token run in LNS,
+  everything else falls back to CPU F32. Same token syntax; set but empty
+  means no op runs in LNS.
+- `LNS16_SUM_POLICY="MUL_MAT:kqv-*=sum32,SOFT_MAX=lpvip"` — LNSCUDA16 only:
+  run the reductions (mul_mat, softmax, rms_norm) of matching ops with another
+  summation mode; the first matching rule wins, the rest use the build's mode.
+  base, lpvip and sum32 need a build with `-DGGML_LNSCUDA16_MIXED=ON`.
 - `LNS_MM_ROUNDTRIP=1|2|3` — in `lns_mul_mat`, round operands to xlns16 but
   accumulate the dot product in IEEE float (1=both operands, 2=weights only,
   3=activations only). Isolates operand quantization from LNS accumulation.

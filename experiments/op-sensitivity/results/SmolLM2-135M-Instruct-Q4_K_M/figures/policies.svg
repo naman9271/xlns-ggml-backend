@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" role="img">
+<title>SmolLM2-135M: perplexity of the key configurations</title><desc>perplexity of the prompt text; the line is the F32 reference (8.474); lpvip left out (section 1)</desc>
+<style>svg{--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--s0:#2a78d6;--s1:#eb6834;--s2:#1baf7a;--s3:#eda100;--s4:#e87ba4;--s5:#008300;--s6:#6250d6;--s7:#e34948}@media (prefers-color-scheme: dark){svg{--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--s0:#3987e5;--s1:#d95926;--s2:#199e70;--s3:#c98500;--s4:#d55181;--s5:#0ca30c;--s6:#9085e9;--s7:#e66767}}text{font-family:system-ui, -apple-system, "Segoe UI", sans-serif;fill:var(--ink2);font-size:12px}.title{fill:var(--ink);font-size:15px;font-weight:600}.sub{fill:var(--ink2);font-size:12px}.tick{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}.lab{fill:var(--ink2);font-size:12px}.grid{stroke:var(--grid);stroke-width:1}.axis{stroke:var(--axis);stroke-width:1}.ref{stroke:var(--muted);stroke-width:1}.l0{stroke:var(--s0);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f0{fill:var(--s0)}.l1{stroke:var(--s1);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f1{fill:var(--s1)}.l2{stroke:var(--s2);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f2{fill:var(--s2)}.l3{stroke:var(--s3);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f3{fill:var(--s3)}.l4{stroke:var(--s4);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f4{fill:var(--s4)}.l5{stroke:var(--s5);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f5{fill:var(--s5)}.l6{stroke:var(--s6);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f6{fill:var(--s6)}.l7{stroke:var(--s7);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}.f7{fill:var(--s7)}</style>
+<rect width="760" height="440" rx="8" style="fill:var(--surface)"/>
+<text class="title" x="76" y="28">SmolLM2-135M: perplexity of the key configurations</text>
+<text class="sub" x="76" y="48">perplexity of the prompt text; the line is the F32 reference (8.474); lpvip left out (section 1)</text>
+<line class="grid" x1="231.0" y1="92" x2="231.0" y2="384"/>
+<text class="tick" x="231.0" y="402" text-anchor="middle">0</text>
+<line class="grid" x1="317.9" y1="92" x2="317.9" y2="384"/>
+<text class="tick" x="317.9" y="402" text-anchor="middle">2</text>
+<line class="grid" x1="404.9" y1="92" x2="404.9" y2="384"/>
+<text class="tick" x="404.9" y="402" text-anchor="middle">4</text>
+<line class="grid" x1="491.8" y1="92" x2="491.8" y2="384"/>
+<text class="tick" x="491.8" y="402" text-anchor="middle">6</text>
+<line class="grid" x1="578.7" y1="92" x2="578.7" y2="384"/>
+<text class="tick" x="578.7" y="402" text-anchor="middle">8</text>
+<line class="grid" x1="665.6" y1="92" x2="665.6" y2="384"/>
+<text class="tick" x="665.6" y="402" text-anchor="middle">10</text>
+<text class="lab" x="483.5" y="428" text-anchor="middle">perplexity</text>
+<text class="lab" x="223" y="114.2" text-anchor="end">all base</text>
+<path class="f6" d="M231.0,97.2 H700.3 Q704.3,97.2 704.3,101.2 V117.2 Q704.3,121.2 700.3,121.2 H231.0 Z"/>
+<text class="lab" x="710.3" y="113.2" text-anchor="start">10.9</text>
+<text class="lab" x="223" y="150.8" text-anchor="end">all monte</text>
+<path class="f6" d="M231.0,133.8 H662.4 Q666.4,133.8 666.4,137.8 V153.8 Q666.4,157.8 662.4,157.8 H231.0 Z"/>
+<text class="lab" x="672.4" y="149.8" text-anchor="start">10</text>
+<text class="lab" x="223" y="187.2" text-anchor="end">all sum32</text>
+<path class="f6" d="M231.0,170.2 H608.7 Q612.7,170.2 612.7,174.2 V190.2 Q612.7,194.2 608.7,194.2 H231.0 Z"/>
+<text class="lab" x="618.7" y="186.2" text-anchor="start">8.78</text>
+<text class="lab" x="223" y="223.8" text-anchor="end">base, rms_norm in sum32</text>
+<path class="f6" d="M231.0,206.8 H638.4 Q642.4,206.8 642.4,210.8 V226.8 Q642.4,230.8 638.4,230.8 H231.0 Z"/>
+<text class="lab" x="648.4" y="222.8" text-anchor="start">9.46</text>
+<text class="lab" x="223" y="260.2" text-anchor="end">base, rms_norm + residual in F32</text>
+<path class="f6" d="M231.0,243.2 H631.2 Q635.2,243.2 635.2,247.2 V263.2 Q635.2,267.2 631.2,267.2 H231.0 Z"/>
+<text class="lab" x="641.2" y="259.2" text-anchor="start">9.3</text>
+<text class="lab" x="223" y="296.8" text-anchor="end">monte, residual in F32</text>
+<path class="f6" d="M231.0,279.8 H629.3 Q633.3,279.8 633.3,283.8 V299.8 Q633.3,303.8 629.3,303.8 H231.0 Z"/>
+<text class="lab" x="639.3" y="295.8" text-anchor="start">9.25</text>
+<text class="lab" x="223" y="333.2" text-anchor="end">sum32, residual in F32</text>
+<path class="f6" d="M231.0,316.2 H592.9 Q596.9,316.2 596.9,320.2 V336.2 Q596.9,340.2 592.9,340.2 H231.0 Z"/>
+<text class="lab" x="602.9" y="332.2" text-anchor="start">8.42</text>
+<text class="lab" x="223" y="369.8" text-anchor="end">best greedy sum32 mix</text>
+<path class="f6" d="M231.0,352.8 H608.0 Q612.0,352.8 612.0,356.8 V372.8 Q612.0,376.8 608.0,376.8 H231.0 Z"/>
+<text class="lab" x="618.0" y="368.8" text-anchor="start">8.77</text>
+<line class="axis" x1="231.0" y1="92" x2="231.0" y2="384"/>
+<line class="ref" x1="599.3" y1="92" x2="599.3" y2="384"/>
+<text class="tick" x="603.3" y="86">F32</text>
+</svg>
