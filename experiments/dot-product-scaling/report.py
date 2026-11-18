@@ -204,6 +204,7 @@ def main():
             w("")
 
     models = sorted(d for d in os.listdir(RESULTS) if os.path.isdir(os.path.join(RESULTS, d)))
+    norm_pts = {}
     for model in models:
         rows = load(os.path.join(RESULTS, model, "replay.jsonl"))
         if not rows:
@@ -265,15 +266,19 @@ def main():
               "sum of squares came out too small, so every normalized output is that much too large. `pred` is "
               "(1+b)^(-1/2) - 1, with b the synthetic positive-sum bias at the same K.")
             w("- `softmax` (input `kq-L`, causal mask, scale 1/8): 1/sum(outputs) - 1, the relative error of the "
-              "denominator, bucketed by K = position + 1. Negative = the denominator came out too small.\n")
+              "denominator, bucketed by K = position + 1. Negative = the denominator came out too small. `pred` is b "
+              "itself.\n")
             w("| op | layer | K | config | rows | bias | sd | pred bias (positive-sum model) |")
             w("|---|---|---|---|---|---|---|---|")
             for r in sorted(norm, key=lambda r: (r["op"], r["layer"], r["K"], CONFIGS.index(r["config"]))):
                 curve = {k: v["acc"]["bias"] for k, v in by.get((r["config"], "positive"), {}).items()}
                 b = interp_lin(curve, r["K"]) if curve else None
-                pred = None if b is None else ((1 + b) ** -0.5 - 1 if r["op"] == "rms_norm" else 1 / (1 + b) - 1)
+                pred = None if b is None else ((1 + b) ** -0.5 - 1 if r["op"] == "rms_norm" else b)
                 if r["op"] == "softmax" and r["K"] < 8:
                     continue
+                if pred is not None and r["outputs"] >= 8:
+                    norm_pts.setdefault(r["config"], []).append(
+                        (pred * 100, r["acc"]["bias"] * 100, f"{short} {r['op']} L{r['layer']}"))
                 w(f"| {r['op']} | {r['layer']} | {r['K']} | {r['config']} | {r['outputs']:.0f} | "
                   f"{r['acc']['bias']*100:+.2f}% | {r['acc']['sd']*100:.2f}% | {'-' if pred is None else f'{pred*100:+.2f}%'} |")
             w("")
@@ -298,6 +303,18 @@ def main():
                 "mean relative error of the denominator in %, over heads and replayed layers; negative = too small",
                 sser, "context length (terms summed)", "denominator error (%)", xlog=True, xbase=2),
                 f"softmax denominator {short}")
+
+    if norm_pts:
+        w("## Normalizers: measured against the positive-sum model\n")
+        w("Every rms_norm and softmax row above (both models, all layers, softmax K >= 8, rows with at least 8 "
+          "outputs) as one point: the bias predicted from the synthetic positive-sum curve at the same K against the "
+          "bias measured on real activations. Points on the diagonal are predicted exactly.\n")
+        figure(w, "normalizers-predicted", plot.scatter(
+            os.path.join(FIGS, "normalizers-predicted.svg"), "Normalizers: measured vs predicted bias",
+            "rms_norm (error of 1/rms) and softmax (error of the denominator), both models, in %; diagonal = exact",
+            [(c, plot.slot(c, i), norm_pts[c]) for i, c in enumerate(CONFIGS) if c in norm_pts],
+            "predicted from the positive-sum model (%)", "measured on real activations (%)", label_top=0, diag=True),
+            "normalizers measured vs predicted")
 
     print("\n".join(out))
 
